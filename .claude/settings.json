@@ -1,0 +1,31 @@
+{
+  "_comment": "AI Context v6.0 \u2014 Auto-generated. SessionStart+UserPromptSubmit Hooks laufen in ALLEN Claude-Umgebungen (Terminal, VS Code, Cursor, JetBrains).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk '/^(\ud83e\udde0|\u2705|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/' || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hooks/pii-warn.sh; fi"
+          }
+        ]
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "_ai_context/**",
+    "_ai_context_template/**"
+  ]
+}

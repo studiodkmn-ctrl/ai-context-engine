@@ -1,0 +1,53 @@
+# 📋 Temp Notes — /Users/adnandikmen/Desktop/test-kontext
+> **Sprint info, active tasks, recent changes. Rolling window — auto-trimmed.**
+> Load for: current task context, sprint status, what changed recently.
+> Last updated: 2026-04-14
+
+---
+
+## 🎯 Sprint Snapshot
+```
+Sprint goal:   [One sentence — what we're building this sprint]
+Active task:   [What Claude is currently helping with right now]
+Blocked by:    [Nothing / description of blocker]
+Due:           [Date or milestone]
+```
+
+---
+
+## 🔄 Recent Changes (last 5)
+```
+2026-04-14 — [What changed in one line]
+2026-04-14 — [What changed in one line]
+2026-04-14 — [What changed in one line]
+2026-04-14 — [What changed in one line]
+2026-04-14 — [What changed in one line]
+```
+> Auto-updated by post-commit hook. Max 5 entries — older entries trimmed automatically.
+
+---
+
+## 📋 Active Tasks
+```
+In Progress:
+  - [ ] [Current task]
+
+Open:
+  - [ ] [Next task]
+  - [ ] [Backlog item]
+
+Done this sprint:
+  - [x] [Completed task]
+```
+
+---
+
+## 🧠 Session Notes (cleared each sprint)
+```
+[Any temporary context Claude should know this sprint but not permanently]
+```
+
+---
+> RULE: Trim "Recent Changes" to last 5 after every update.
+> RULE: Clear "Session Notes" at sprint start.
+> Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md

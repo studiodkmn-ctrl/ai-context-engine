@@ -1,0 +1,656 @@
+#!/usr/bin/env bash
+# =============================================================================
+# ai-context-registry.sh — YAML-Registry Tool (v6.0)
+#
+# Sprint 1: YAML-Registry + HTML-Anker + Keyword-Suche
+# Sprint 2: Ollama-Embeddings + SQLite Query-Cache (via ai-rag-cache.sh)
+#
+# Usage:
+#   bash _ai_context/scripts/ai-context-registry.sh --scan             # registry.yaml aufbauen
+#   bash _ai_context/scripts/ai-context-registry.sh --add-anchors [f]  # HTML-Anker injizieren
+#   bash _ai_context/scripts/ai-context-registry.sh --embed            # Chunk-Embeddings via Ollama
+#   bash _ai_context/scripts/ai-context-registry.sh --find <query>     # Semantische Suche (Ollama→Keyword)
+#   bash _ai_context/scripts/ai-context-registry.sh --get <chunk-id>   # Chunk extrahieren
+#   bash _ai_context/scripts/ai-context-registry.sh --dedup            # Duplikat-Check
+#   bash _ai_context/scripts/ai-context-registry.sh --list             # Alle Chunks auflisten
+#   bash _ai_context/scripts/ai-context-registry.sh --stats            # Zusammenfassung
+# =============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTEXT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REGISTRY="$CONTEXT_DIR/registry.yaml"
+TODAY=$(date +"%Y-%m-%dT%H:%M:%S")
+DATE_SHORT=$(date +"%Y-%m-%d")
+
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RED='\033[0;31m'; NC='\033[0m'
+
+# Sprint 2: RAG-Cache Tool (liegt im selben scripts/ Verzeichnis)
+RAG_CACHE_TOOL="$SCRIPT_DIR/ai-rag-cache.sh"
+
+# ===========================================================================
+# --scan: Scanne alle Knowledge-Dateien nach Ankern → registry.yaml schreiben
+# ===========================================================================
+if [ "${1:-}" = "--scan" ]; then
+  PROJECT_NAME=$(basename "$(cd "$CONTEXT_DIR/.." && pwd)")
+
+  # Python schreibt registry.yaml und gibt Zusammenfassung auf stdout aus
+  SCAN_RESULT=$(python3 - "$CONTEXT_DIR" "$PROJECT_NAME" "$TODAY" "$DATE_SHORT" 2>/dev/null << 'PYEOF'
+import sys, re, pathlib, hashlib
+
+ctx = pathlib.Path(sys.argv[1])
+project_name = sys.argv[2]
+generated = sys.argv[3]
+date_short = sys.argv[4]
+
+KNOWLEDGE_FILES = [
+    ("_gotchas.md",            "gotcha"),
+    ("debug_patterns.md",      "debug"),
+    ("security.md",            "security"),
+    ("testing.md",             "rule"),
+    ("backend/auth.md",        "rule"),
+    ("backend/database.md",    "rule"),
+    ("backend/endpoints.md",   "endpoint"),
+    ("frontend/components.md", "component"),
+    ("frontend/state.md",      "rule"),
+    ("frontend/routing.md",    "rule"),
+    ("architecture.md",        "arch"),
+    ("decisions.md",           "arch"),
+]
+
+STOPWORDS = {
+    'the','and','for','ist','der','die','das','bei','von','mit','nicht',
+    'wird','kann','alle','src','lib','use','new','get','set','add','run',
+    'via','nur','immer','oder','api','file','node','statt','ohne','nach',
+    'kein','import','from','this','that','with','scope','pattern',
+    'violates','return','func','just','only',
+}
+
+ANCHOR_RE = re.compile(
+    r'<!-- #(\w+) -->\n([\s\S]*?)<!-- /\1 -->',
+    re.MULTILINE
+)
+
+chunks = []
+no_anchor_files = []
+
+for rel_file, chunk_type in KNOWLEDGE_FILES:
+    fpath = ctx / rel_file
+    if not fpath.exists():
+        continue
+    content = fpath.read_text(encoding='utf-8')
+    found = list(ANCHOR_RE.finditer(content))
+
+    if not found:
+        if re.search(r'```\s*\n(?:ID:|RULE:)', content):
+            no_anchor_files.append(rel_file)
+        continue
+
+    for m in found:
+        cid = m.group(1)
+        text = m.group(2).strip()
+
+        # Platzhalter überspringen
+        if cid.startswith('_') or cid.lower() == 'template':
+            continue
+
+        # Priorität
+        pm = re.search(r'\nP:\s*([123])', text)
+        priority = int(pm.group(1)) if pm else 2
+
+        # Tags aus Schlüsselzeilen
+        words = set()
+        for lp in [r'→\s*([^\n]+)', r'@\s*([^\n]+)', r'scope:\s*([^\n]+)']:
+            lm = re.search(lp, text)
+            if lm:
+                words.update(re.findall(r'[a-zA-Z][a-zA-Z0-9_-]{2,}', lm.group(1).lower()))
+        words.update(p for p in re.split(r'[_\-]', cid.lower()) if len(p) > 2)
+        tags = sorted(
+            w for w in words
+            if w not in STOPWORDS and len(w) > 2 and w.replace('-', '').isalpha()
+        )[:8]
+
+        # Token-Schätzung (identisch zu ai-session-prep.sh)
+        code_blocks = re.findall(r'```[\s\S]*?```', text)
+        code_chars = sum(len(b) for b in code_blocks)
+        prose = re.sub(r'```[\s\S]*?```', '', text)
+        tokens = max(int(len(prose.split()) * 1.8) + int(code_chars * 0.35), 5)
+
+        # SHA1-Hash
+        chunk_hash = 'sha1:' + hashlib.sha1(text.encode('utf-8')).hexdigest()[:8]
+
+        chunks.append({
+            'id': cid, 'type': chunk_type, 'priority': priority,
+            'file': rel_file, 'anchor': cid, 'tags': tags,
+            'tokens': tokens, 'hash': chunk_hash, 'updated': date_short,
+        })
+
+# registry.yaml schreiben
+lines = [
+    "# AI Context Registry v6.0",
+    "# Auto-generated by ai-context-registry.sh --scan",
+    "# DO NOT EDIT MANUALLY — regenerate mit:",
+    "#   bash _ai_context/scripts/ai-context-registry.sh --scan",
+    f'version: "6.0"',
+    f'generated: "{generated}"',
+    f'project: "{project_name}"',
+    "",
+    "chunks:",
+]
+
+if not chunks:
+    lines.append("  []")
+else:
+    for c in chunks:
+        tags_str = ', '.join(c['tags'])
+        lines += [
+            f"  - id: {c['id']}",
+            f"    type: {c['type']}",
+            f"    priority: {c['priority']}",
+            f"    file: {c['file']}",
+            f"    anchor: {c['anchor']}",
+            f"    tags: [{tags_str}]",
+            f"    tokens: {c['tokens']}",
+            f"    hash: \"{c['hash']}\"",
+            f"    updated: {c['updated']}",
+            "",
+        ]
+
+(ctx / 'registry.yaml').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+# Ergebnis ausgeben (für bash-Parsing)
+print(f"CHUNKS:{len(chunks)}")
+print(f"NOANCHOR:{len(no_anchor_files)}")
+for f in no_anchor_files:
+    print(f"FILE:{f}")
+PYEOF
+)
+
+  CHUNK_COUNT=$(printf '%s\n' "$SCAN_RESULT" | grep '^CHUNKS:' | cut -d: -f2 || echo "0")
+  NO_ANCHOR_COUNT=$(printf '%s\n' "$SCAN_RESULT" | grep '^NOANCHOR:' | cut -d: -f2 || echo "0")
+  NO_ANCHOR_FILES=$(printf '%s\n' "$SCAN_RESULT" | grep '^FILE:' | cut -d: -f2- || true)
+
+  echo -e "${GREEN}✅ registry.yaml erstellt${NC} — ${CHUNK_COUNT:-0} Chunks indexiert"
+  echo -e "   ${CYAN}Pfad: $REGISTRY${NC}"
+
+  if [ "${NO_ANCHOR_COUNT:-0}" -gt 0 ] && [ -n "${NO_ANCHOR_FILES:-}" ]; then
+    echo ""
+    echo -e "${YELLOW}⚠️  ${NO_ANCHOR_COUNT} Datei(en) mit ID:-Blöcken aber ohne Anker (nicht indexiert):${NC}"
+    while IFS= read -r f; do
+      [ -n "$f" ] && echo -e "   → $f"
+    done <<< "$NO_ANCHOR_FILES"
+    echo -e "   ${CYAN}Lösung: bash $0 --add-anchors && bash $0 --scan${NC}"
+  fi
+
+  # Sprint 2: Embeddings aktualisieren wenn Ollama läuft
+  if [ -f "$RAG_CACHE_TOOL" ] && \
+     curl -s --max-time 2 "http://localhost:11434/api/tags" > /dev/null 2>&1; then
+    echo ""
+    echo -e "${CYAN}🧮 Ollama läuft — aktualisiere Embeddings...${NC}"
+    bash "$RAG_CACHE_TOOL" --embed-chunks "$REGISTRY" 2>/dev/null || true
+  fi
+  exit 0
+fi
+
+# ===========================================================================
+# --embed: Chunk-Embeddings via Ollama generieren (delegiert an ai-rag-cache.sh)
+# ===========================================================================
+if [ "${1:-}" = "--embed" ]; then
+  if [ ! -f "$RAG_CACHE_TOOL" ]; then
+    echo -e "${RED}❌ ai-rag-cache.sh nicht gefunden.${NC} Bitte install.sh neu ausführen."
+    exit 1
+  fi
+  bash "$RAG_CACHE_TOOL" --embed-chunks "${2:-$REGISTRY}"
+  exit 0
+fi
+
+# ===========================================================================
+# --add-anchors [file]: HTML-Anker für ID:/RULE: Blöcke injizieren (idempotent)
+# ===========================================================================
+if [ "${1:-}" = "--add-anchors" ]; then
+  if [ -n "${2:-}" ]; then
+    if [ -f "$2" ]; then
+      TARGET_FILES=("$2")
+    elif [ -f "$CONTEXT_DIR/$2" ]; then
+      TARGET_FILES=("$CONTEXT_DIR/$2")
+    else
+      echo -e "${RED}❌ Datei nicht gefunden: $2${NC}" && exit 1
+    fi
+  else
+    TARGET_FILES=()
+    for f in "_gotchas.md" "debug_patterns.md" "security.md" "testing.md" \
+             "backend/auth.md" "backend/database.md" "backend/endpoints.md" \
+             "frontend/components.md" "frontend/state.md" "frontend/routing.md"; do
+      [ -f "$CONTEXT_DIR/$f" ] && TARGET_FILES+=("$CONTEXT_DIR/$f")
+    done
+  fi
+
+  TOTAL_INJECTED=0
+
+  for ABS_FILE in "${TARGET_FILES[@]}"; do
+    INJECTED=$(python3 - "$ABS_FILE" 2>/dev/null << 'PYEOF'
+import re, pathlib, sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.exists():
+    print(0)
+    sys.exit(0)
+
+content = path.read_text(encoding='utf-8')
+
+# Match code-fence blocks mit ID: oder RULE: als erste Zeile
+block_re = re.compile(
+    r'(```[ \t]*\n)((?:ID:|RULE:)\s*(\S+)[^\n]*\n[\s\S]*?)(```)',
+    re.MULTILINE
+)
+
+count = 0
+
+def wrap(m):
+    global count, content
+    id_val = m.group(3).strip()
+    # Platzhalter überspringen
+    if id_val.startswith('_') or id_val.lower() == 'template':
+        return m.group(0)
+    # Idempotenz: bereits verankert?
+    if f'<!-- #{id_val} -->' in content:
+        return m.group(0)
+    count += 1
+    return (
+        f'<!-- #{id_val} -->\n'
+        f'{m.group(1)}{m.group(2)}{m.group(4)}\n'
+        f'<!-- /{id_val} -->'
+    )
+
+new_content = block_re.sub(wrap, content)
+if new_content != content:
+    path.write_text(new_content, encoding='utf-8')
+print(count)
+PYEOF
+)
+    INJECTED="${INJECTED:-0}"
+    TOTAL_INJECTED=$((TOTAL_INJECTED + INJECTED))
+    FNAME=$(basename "$ABS_FILE")
+    if [ "$INJECTED" -gt 0 ]; then
+      echo -e "  ${GREEN}✅ $FNAME${NC}: $INJECTED Anker injiziert"
+    else
+      echo -e "  ${CYAN}→  $FNAME${NC}: bereits verankert (oder kein ID:/RULE:-Block)"
+    fi
+  done
+
+  echo ""
+  echo -e "${GREEN}✅ Anker-Injektion${NC} — $TOTAL_INJECTED neue Anker"
+  [ "$TOTAL_INJECTED" -gt 0 ] && \
+    echo -e "   ${CYAN}Jetzt: bash $0 --scan${NC} um registry.yaml zu aktualisieren"
+  exit 0
+fi
+
+# ===========================================================================
+# --get <chunk-id>: Chunk-Text zwischen Ankern extrahieren
+# BSD awk safe: exakter String-Vergleich statt Regex
+# ===========================================================================
+if [ "${1:-}" = "--get" ]; then
+  CHUNK_ID="${2:-}"
+  [ -z "$CHUNK_ID" ] && echo "Usage: --get <chunk-id>" && exit 1
+  if [ ! -f "$REGISTRY" ]; then
+    echo -e "${RED}❌ registry.yaml nicht gefunden.${NC} Bitte --scan ausführen."
+    exit 1
+  fi
+
+  # Quelldatei aus Registry ermitteln
+  FILE=$(python3 - "$REGISTRY" "$CHUNK_ID" 2>/dev/null << 'PYEOF'
+import sys
+target_id = sys.argv[2]
+current_id = None
+with open(sys.argv[1], encoding='utf-8') as f:
+    for line in f:
+        s = line.strip()
+        if s.startswith('- id:'):
+            current_id = s.split(':', 1)[1].strip()
+        elif s.startswith('file:') and current_id == target_id:
+            print(s.split(':', 1)[1].strip())
+            break
+PYEOF
+)
+
+  if [ -z "$FILE" ]; then
+    echo -e "${RED}❌ Chunk nicht gefunden:${NC} $CHUNK_ID"
+    echo -e "   Verfügbare IDs: bash $0 --list"
+    exit 1
+  fi
+
+  ABS_FILE="$CONTEXT_DIR/$FILE"
+  if [ ! -f "$ABS_FILE" ]; then
+    echo -e "${RED}❌ Quelldatei nicht gefunden:${NC} $ABS_FILE"
+    exit 1
+  fi
+
+  # Exakter String-Vergleich → portabel auf BSD awk (macOS) und GNU awk
+  awk -v id="$CHUNK_ID" '
+    $0 == "<!-- #" id " -->" { cap=1; next }
+    cap && $0 == "<!-- /" id " -->" { exit }
+    cap { print }
+  ' "$ABS_FILE"
+  exit 0
+fi
+
+# ===========================================================================
+# --find <query>: Semantische Suche (Sprint 2: Ollama+Cache | Fallback: Keyword)
+# ===========================================================================
+if [ "${1:-}" = "--find" ]; then
+  shift
+  QUERY="$*"
+  [ -z "$QUERY" ] && echo "Usage: --find <query terms>" && exit 1
+  if [ ! -f "$REGISTRY" ]; then
+    echo -e "${RED}❌ registry.yaml nicht gefunden.${NC} Bitte --scan ausführen."
+    exit 1
+  fi
+
+  # Sprint 2: Ollama-Pfad via ai-rag-cache.sh (enthält Cache + Embedding + Keyword-Fallback)
+  if [ -f "$RAG_CACHE_TOOL" ]; then
+    bash "$RAG_CACHE_TOOL" --find "$QUERY" "$REGISTRY"
+    exit 0
+  fi
+
+  # Sprint 1 Fallback: Keyword-Suche (wenn ai-rag-cache.sh nicht vorhanden)
+  python3 - "$REGISTRY" "$QUERY" 2>/dev/null << 'PYEOF'
+import sys, re
+
+registry_path = sys.argv[1]
+query = sys.argv[2].lower()
+q_words = set(re.findall(r'[a-z][a-z0-9_-]+', query))
+
+chunks = []
+current = {}
+with open(registry_path, encoding='utf-8') as f:
+    for line in f:
+        s = line.strip()
+        if s.startswith('- id:'):
+            if current.get('id'):
+                chunks.append(current)
+            current = {'id': s.split(':',1)[1].strip(), 'tags':[], 'priority':2,
+                       'type':'', 'file':'', 'tokens':0}
+        elif s.startswith('type:') and current:
+            current['type'] = s.split(':',1)[1].strip()
+        elif s.startswith('priority:') and current:
+            try: current['priority'] = int(s.split(':',1)[1].strip())
+            except: pass
+        elif s.startswith('file:') and current:
+            current['file'] = s.split(':',1)[1].strip()
+        elif s.startswith('tags:') and current:
+            tags_raw = s.split(':',1)[1].strip().strip('[]')
+            current['tags'] = [t.strip() for t in tags_raw.split(',') if t.strip()]
+        elif s.startswith('tokens:') and current:
+            try: current['tokens'] = int(s.split(':',1)[1].strip())
+            except: pass
+    if current.get('id'):
+        chunks.append(current)
+
+results = []
+for c in chunks:
+    haystack = set([c['id']] + c['tags'] + [c['type']])
+    haystack.update(re.split(r'[_\-]', c['id']))
+    score = len(q_words & haystack)
+    if score > 0:
+        results.append((c['priority'], -score, c['id'], c['file'], c['tokens']))
+
+results.sort()
+
+if not results:
+    print("  (keine Treffer)")
+    sys.exit(0)
+
+print(f"\n  [KEYWORD] {'P':<3} {'ID':<32} {'Datei':<30} {'~Tok':>5}")
+print(f"  {'-'*3} {'-'*32} {'-'*30} {'-'*5}")
+for prio, neg_score, cid, f, tok in results:
+    print(f"  P{prio}  {cid:<32} {f:<30} {tok:>4}  (score:{-neg_score})")
+PYEOF
+  exit 0
+fi
+
+# ===========================================================================
+# --dedup: Hash-basierter Dedup (exakt) + Near-Dup via Tag-Jaccard
+# ===========================================================================
+if [ "${1:-}" = "--dedup" ]; then
+  if [ ! -f "$REGISTRY" ]; then
+    echo -e "${RED}❌ registry.yaml nicht gefunden.${NC} Bitte --scan ausführen."
+    exit 1
+  fi
+  echo -e "${CYAN}🔍 Deduplication-Check (registry-basiert)...${NC}"
+  echo ""
+
+  python3 - "$REGISTRY" 2>/dev/null << 'PYEOF'
+import sys
+
+chunks = []
+current = {}
+with open(sys.argv[1], encoding='utf-8') as f:
+    for line in f:
+        s = line.strip()
+        if s.startswith('- id:'):
+            if current.get('id'):
+                chunks.append(current)
+            current = {'id': s.split(':',1)[1].strip(), 'tags':[], 'hash':'', 'priority':2}
+        elif s.startswith('hash:') and current:
+            # Entferne "sha1:" Prefix für Vergleich
+            h = s.split(':',1)[1].strip().strip('"')
+            current['hash'] = h.replace('sha1:', '') if h.startswith('sha1:') else h
+        elif s.startswith('priority:') and current:
+            try: current['priority'] = int(s.split(':',1)[1].strip())
+            except: pass
+        elif s.startswith('tags:') and current:
+            tags_raw = s.split(':',1)[1].strip().strip('[]')
+            current['tags'] = [t.strip() for t in tags_raw.split(',') if t.strip()]
+    if current.get('id'):
+        chunks.append(current)
+
+print(f"Prüfe {len(chunks)} Chunks...\n")
+
+# 1. Exakte Hash-Duplikate O(n)
+seen = {}
+exact = []
+for c in chunks:
+    h = c.get('hash', '')
+    if not h or h in ('nohash01',):
+        continue
+    if h in seen:
+        exact.append((seen[h], c['id']))
+    else:
+        seen[h] = c['id']
+
+# 2. Near-Dups via Tag-Jaccard O(n²), n ist klein (max ~60)
+exact_ids = {a for a,b in exact} | {b for a,b in exact}
+near = []
+for i, c1 in enumerate(chunks):
+    if c1['id'] in exact_ids: continue
+    t1 = set(c1['tags'])
+    if len(t1) < 2: continue
+    for c2 in chunks[i+1:]:
+        if c2['id'] in exact_ids: continue
+        t2 = set(c2['tags'])
+        if len(t2) < 2: continue
+        over = len(t1 & t2)
+        uni = len(t1 | t2)
+        if uni > 0 and over / uni >= 0.65:
+            near.append((c1['id'], c2['id'], over, uni))
+
+found = len(exact) + len(near)
+
+if exact:
+    print("🔴 Exakte Duplikate (identischer Hash):")
+    for a, b in exact:
+        print(f"  DUPLICATE: {a}  ↔  {b}")
+        print(f"  → Empfehlung: einen Eintrag löschen oder mergen")
+    print()
+
+if near:
+    print("⚠️  Near-Duplikate (Tag-Ähnlichkeit ≥65%):")
+    for a, b, over, uni in near:
+        pct = int(over / uni * 100)
+        print(f"  NEAR-DUP: {a}  ↔  {b}  ({over}/{uni} Tags = {pct}%)")
+    print()
+
+if found == 0:
+    print("✅ Keine Duplikate gefunden")
+else:
+    print(f"\n→ {found} Paare gefunden. Vor Writeback: Update statt neuen Eintrag anlegen.")
+PYEOF
+  exit 0
+fi
+
+# ===========================================================================
+# --list: Alle Chunks tabellarisch auflisten
+# ===========================================================================
+if [ "${1:-}" = "--list" ]; then
+  if [ ! -f "$REGISTRY" ]; then
+    echo -e "${RED}❌ registry.yaml nicht gefunden.${NC} Bitte --scan ausführen."
+    exit 1
+  fi
+
+  python3 - "$REGISTRY" 2>/dev/null << 'PYEOF'
+import sys
+
+chunks = []
+current = {}
+with open(sys.argv[1], encoding='utf-8') as f:
+    for line in f:
+        s = line.strip()
+        if s.startswith('- id:'):
+            if current.get('id'):
+                chunks.append(current)
+            current = {'id': s.split(':',1)[1].strip(), 'type':'', 'priority':2,
+                       'file':'', 'tokens':0}
+        elif s.startswith('type:') and current:
+            current['type'] = s.split(':',1)[1].strip()
+        elif s.startswith('priority:') and current:
+            try: current['priority'] = int(s.split(':',1)[1].strip())
+            except: pass
+        elif s.startswith('file:') and current:
+            current['file'] = s.split(':',1)[1].strip()
+        elif s.startswith('tokens:') and current:
+            try: current['tokens'] = int(s.split(':',1)[1].strip())
+            except: pass
+    if current.get('id'):
+        chunks.append(current)
+
+if not chunks:
+    print("  (Registry leer — bitte --scan ausführen)")
+    sys.exit(0)
+
+print(f"\n  {'ID':<32} {'Type':<10} {'P':<3} {'Datei':<28} {'~Tok':>5}")
+print(f"  {'-'*32} {'-'*10} {'-'*3} {'-'*28} {'-'*5}")
+total_tokens = 0
+for c in sorted(chunks, key=lambda x: (x['priority'], x['file'])):
+    print(f"  {c['id']:<32} {c['type']:<10} P{c['priority']} {c['file']:<28} {c['tokens']:>4}")
+    total_tokens += c['tokens']
+files = set(c['file'] for c in chunks)
+print(f"\n  Total: {len(chunks)} Chunks | ~{total_tokens} Tokens | {len(files)} Datei(en)")
+PYEOF
+  exit 0
+fi
+
+# ===========================================================================
+# --stats: Token-Statistiken und Ersparnis-Schätzung
+# ===========================================================================
+if [ "${1:-}" = "--stats" ]; then
+  if [ ! -f "$REGISTRY" ]; then
+    echo -e "${RED}❌ registry.yaml nicht gefunden.${NC} Bitte --scan ausführen."
+    exit 1
+  fi
+
+  python3 - "$REGISTRY" 2>/dev/null << 'PYEOF'
+import sys, re, collections
+
+chunks = []
+meta = {}
+current = {}
+with open(sys.argv[1], encoding='utf-8') as f:
+    for line in f:
+        s = line.strip()
+        if s.startswith('version:'):
+            meta['version'] = s.split(':',1)[1].strip().strip('"')
+        elif s.startswith('generated:'):
+            meta['generated'] = s.split(':',1)[1].strip().strip('"')
+        elif s.startswith('project:'):
+            meta['project'] = s.split(':',1)[1].strip().strip('"')
+        elif s.startswith('- id:'):
+            if current.get('id'):
+                chunks.append(current)
+            current = {'id': s.split(':',1)[1].strip(), 'type':'', 'priority':2,
+                       'file':'', 'tokens':0}
+        elif s.startswith('type:') and current:
+            current['type'] = s.split(':',1)[1].strip()
+        elif s.startswith('priority:') and current:
+            try: current['priority'] = int(s.split(':',1)[1].strip())
+            except: pass
+        elif s.startswith('tokens:') and current:
+            try: current['tokens'] = int(s.split(':',1)[1].strip())
+            except: pass
+        elif s.startswith('file:') and current:
+            current['file'] = s.split(':',1)[1].strip()
+    if current.get('id'):
+        chunks.append(current)
+
+p_counts = collections.Counter(c['priority'] for c in chunks)
+t_counts = collections.Counter(c['type'] for c in chunks)
+total_tokens = sum(c['tokens'] for c in chunks)
+max_chunk = max(chunks, key=lambda x: x['tokens'], default={'id': '-', 'tokens': 0})
+files = set(c['file'] for c in chunks)
+p1_count = p_counts[1]
+
+# Ersparnis-Schätzung
+inline_estimate = p1_count * 45 + 30   # P1 inline + Pointer-Block
+v52_all = total_tokens
+savings = max(v52_all - inline_estimate, 0)
+savings_pct = int(savings / v52_all * 100) if v52_all > 0 else 0
+
+print(f"\n  Registry v{meta.get('version','?')}  —  {meta.get('project','?')}")
+print(f"  Generiert: {meta.get('generated','?')}")
+print(f"  {'─'*58}")
+p_str = f"P1: {p_counts[1]}  |  P2: {p_counts[2]}  |  P3: {p_counts[3]}"
+print(f"  Chunks:   {len(chunks)}  ({p_str})")
+type_str = '  |  '.join(f"{t}: {n}" for t, n in sorted(t_counts.items()))
+print(f"  Typen:    {type_str}")
+avg = total_tokens // len(chunks) if chunks else 0
+print(f"  Tokens:   Gesamt: {v52_all}  |  Ø/Chunk: {avg}  |  Max: {max_chunk['tokens']} ({max_chunk['id']})")
+print(f"  Dateien:  {len(files)} indexiert")
+print(f"  {'─'*58}")
+print(f"  Token-Ersparnis (Gotchas-Sektion):")
+print(f"    v5.2 (alle Chunks laden):   ~{v52_all} Tokens")
+print(f"    v6.0 S1 (P1 + task-aware):  ~{inline_estimate} Tokens")
+print(f"    Ersparnis:                  ~{savings} Tokens ({savings_pct}%)")
+print(f"  {'─'*58}")
+print(f"  v6.0 Sprint 2 (Ollama): 1 Chunk inline → ~{p1_count*45+30} Tokens statt ~{v52_all}")
+print()
+PYEOF
+  exit 0
+fi
+
+# ===========================================================================
+# Hilfe / unbekannter Befehl
+# ===========================================================================
+cat << 'HELP'
+AI Context Registry v6.0
+
+Usage:
+  bash ai-context-registry.sh --scan                  # registry.yaml aufbauen (+ auto-embed wenn Ollama läuft)
+  bash ai-context-registry.sh --add-anchors [file]    # HTML-Anker injizieren
+  bash ai-context-registry.sh --embed                 # Chunk-Embeddings via Ollama generieren (Sprint 2)
+  bash ai-context-registry.sh --find <query>          # Semantische Suche: Ollama→Cache→Keyword
+  bash ai-context-registry.sh --get <chunk-id>        # Chunk-Text extrahieren
+  bash ai-context-registry.sh --dedup                 # Duplikat-Check (hash-basiert)
+  bash ai-context-registry.sh --list                  # Alle Chunks auflisten
+  bash ai-context-registry.sh --stats                 # Token-Statistiken + Ersparnis
+
+Workflow (einmalig bei Setup):
+  1. --add-anchors   ← HTML-Anker in Knowledge-Dateien injizieren
+  2. --scan          ← registry.yaml aufbauen (triggert auto --embed wenn Ollama läuft)
+  3. --list          ← Chunks prüfen
+  4. --find "auth"   ← Suche testen (Ollama wenn verfügbar, sonst Keyword)
+  5. --stats         ← Token-Ersparnis sehen
+
+Sprint 2 Extras (Ollama erforderlich):
+  --embed            ← Embeddings für alle Chunks generieren
+  --find             ← Semantische Suche statt Keyword-Matching
+HELP
+exit 0

@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# =============================================================================
+# post-commit hook — AI Context Auto-Invalidation v5
+#
+# FIXES vs v4.1:
+#   - sed patterns match actual _ai_index.md table format: | `file` | ✅ |
+#   - Removed broken Status:** pattern (individual files don't have this)
+#   - Added auto-regeneration of _SESSION.md
+#   - Cleaner invalidation with escalation logic (⚠️→❌ yes, ❌→⚠️ no)
+# =============================================================================
+
+CONTEXT_DIR="./_ai_context"
+[ ! -d "$CONTEXT_DIR" ] && exit 0
+
+# -M50% to detect renames (both old + new paths flow through the rules below)
+RAW_DIFF=$(git diff -M50% --name-status HEAD~1 HEAD 2>/dev/null \
+        || git diff -M50% --name-status HEAD 2>/dev/null)
+CHANGED=$(awk -F'\t' '$1 ~ /^R/ { print $2; print $3; next } { for(i=2;i<=NF;i++) print $i }' <<< "$RAW_DIFF")
+[ -z "$CHANGED" ] && exit 0
+
+YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+TODAY=$(date +"%Y-%m-%d")
+INDEX="$CONTEXT_DIR/_ai_index.md"
+TEMP="$CONTEXT_DIR/_temp_notes.md"
+
+# macOS-portable Hash-Funktion
+portable_md5() {
+  md5sum "$1" 2>/dev/null | cut -d' ' -f1 \
+    || md5 -r "$1" 2>/dev/null | cut -d' ' -f1 \
+    || echo "n/a"
+}
+
+# ---- Multi-Fingerprint update ----
+NEW_HASH=$(git log -1 --format="%H")
+NEW_MSG=$(git log -1 --format="%s")
+
+PKG_HASH=$(portable_md5 package.json 2>/dev/null || portable_md5 requirements.txt 2>/dev/null || echo "n/a")
+SCHEMA_HASH=$(portable_md5 prisma/schema.prisma 2>/dev/null || echo "n/a")
+ENV_EXISTS=$([ -f .env ] && echo "yes" || echo "no")
+
+if [ -f "$INDEX" ]; then
+  sed -i.bak "s#Last known git hash:.*#Last known git hash:    $NEW_HASH#" "$INDEX"
+  sed -i.bak "s#pkg.json hash:.*#pkg.json hash:          sha256:${PKG_HASH}#" "$INDEX"
+  sed -i.bak "s#schema hash:.*#schema hash:            sha256:${SCHEMA_HASH}#" "$INDEX"
+  sed -i.bak "s#.env exists:.*#.env exists:            ${ENV_EXISTS}#" "$INDEX"
+  sed -i.bak "s#Last session date:.*#Last session date:      $TODAY#" "$INDEX"
+  rm -f "${INDEX}.bak"
+fi
+
+# ---- Invalidation function ----
+# FIX: Only updates _ai_index.md table (| `file` | STATUS |)
+# Individual .md files have no status headers — that was the v4.1 bug
+INVALIDATED=()
+
+invalidate_index() {
+  local context_file="$1"
+  local new_marker="$2"
+  
+  [ ! -f "$INDEX" ] && return
+  
+  local escaped=$(echo "$context_file" | sed 's/\//\\\//g')
+  
+  # Match: | `backend/api.md` | ✅ | → | `backend/api.md` | ❌ |
+  sed -i.bak "s/| \`${escaped}\` | ✅ |/| \`${escaped}\` | ${new_marker} |/" "$INDEX"
+  
+  # Escalation: ⚠️ → ❌ (but never ❌ → ⚠️)
+  if [ "$new_marker" = "❌" ]; then
+    sed -i.bak "s/| \`${escaped}\` | ⚠️ |/| \`${escaped}\` | ${new_marker} |/" "$INDEX"
+  fi
+  
+  rm -f "${INDEX}.bak"
+  INVALIDATED+=("$context_file → $new_marker")
+}
+
+# ---- Apply rules (stack-agnostic) ----
+# Schema / DB
+echo "$CHANGED" | grep -qiE 'prisma/schema|models\.py|migration' && {
+  invalidate_index "backend/database.md" "❌"
+  invalidate_index "backend/api.md" "⚠️"
+}
+
+# API routes
+echo "$CHANGED" | grep -qiE 'src/app/api/|routers/|routes/|views\.py|urls\.py' && \
+  invalidate_index "backend/api.md" "❌"
+
+# Components / UI
+echo "$CHANGED" | grep -qiE 'src/components/|\.tsx$|\.jsx$' && \
+  invalidate_index "frontend/components.md" "❌"
+
+echo "$CHANGED" | grep -qiE 'src/app/' && \
+  invalidate_index "frontend/components.md" "⚠️"
+
+# State
+echo "$CHANGED" | grep -qiE 'store/|context/|lib/store|hooks/' && \
+  invalidate_index "frontend/state.md" "❌"
+
+# Auth
+echo "$CHANGED" | grep -qiE 'middleware\.|auth\.' && {
+  invalidate_index "backend/api.md" "❌"
+  invalidate_index "frontend/state.md" "⚠️"
+}
+
+# Config — nur bei strukturellen Änderungen invalidieren, nicht bei reinen Version-Bumps
+echo "$CHANGED" | grep -qiE 'package\.json|requirements\.txt|pyproject\.toml' && {
+  IS_VERSION_BUMP=false
+  if echo "$CHANGED" | grep -q "package.json"; then
+    # Prüfe ob ausschließlich das "version" Feld geändert wurde
+    PKG_DIFF=$(git diff HEAD~1 HEAD -- package.json 2>/dev/null | grep '^[+-]' | grep -v '^[+-][+-][+-]' || echo "")
+    CHANGED_KEYS=$(echo "$PKG_DIFF" | grep -oE '"[a-zA-Z_-]+"' | sort -u | tr '\n' ',' | tr -d '"')
+    if [ "$CHANGED_KEYS" = "version," ] || [ "$CHANGED_KEYS" = "version" ]; then
+      IS_VERSION_BUMP=true
+    fi
+  fi
+  if ! $IS_VERSION_BUMP; then
+    invalidate_index "architecture.md" "⚠️"
+    invalidate_index "decisions.md" "⚠️"
+  fi
+}
+
+echo "$CHANGED" | grep -qiE 'tailwind\.config' && \
+  invalidate_index "frontend/components.md" "⚠️"
+
+echo "$CHANGED" | grep -qiE 'next\.config|vite\.config' && \
+  invalidate_index "architecture.md" "⚠️"
+
+echo "$CHANGED" | grep -qiE '\.env' && \
+  invalidate_index "backend/api.md" "⚠️"
+
+# ---- Update _temp_notes.md ----
+if [ -f "$TEMP" ]; then
+  sed -i.bak "s#Last change:.*#Last change:   ${TODAY} — ${NEW_MSG}#" "$TEMP"
+  rm -f "${TEMP}.bak"
+fi
+
+# ---- Quick Change Log ----
+if [ -f "$INDEX" ]; then
+  CHANGED_SUMMARY=$(echo "$CHANGED" | head -3 | tr '\n' ', ' | sed 's/,$//')
+  NEW_LOG_LINE="- ${TODAY}: ${NEW_MSG} (${CHANGED_SUMMARY})"
+  sed -i.bak "/## 📝 Quick Change Log/a\\
+${NEW_LOG_LINE}" "$INDEX"
+  rm -f "${INDEX}.bak"
+fi
+
+# ---- Auto-Trim (v5.2 — Priority-Based, nie P1 löschen) ----
+python3 << 'PYEOF'
+import re, pathlib, sys
+
+ctx = pathlib.Path("./_ai_context")
+if not ctx.exists():
+    sys.exit(0)
+
+# Wissensdateien mit Eintragslimits
+# Format: Einträge sind ``` ... ``` Blöcke mit ID: oder RULE: als erste Zeile darin
+knowledge_files = {"_gotchas.md": 15, "debug_patterns.md": 15, "security.md": 10, "testing.md": 10}
+
+def get_priority(block_text):
+    """Lese P: Feld aus einem Eintrag. Default: 2 (rückwärtskompatibel)."""
+    m = re.search(r'\nP:\s*([123])', block_text)
+    return int(m.group(1)) if m else 2
+
+def priority_trim(content, max_entries, fname):
+    """Trimmt Einträge nach Priorität: P3 zuerst, dann P2. P1 niemals löschen."""
+    # Finde Header (alles vor dem ersten ``` Block mit ID:/RULE:)
+    # Eintrag-Format: ``` \nID: ... \n ... ```  oder  ``` \nRULE: ... \n ... ```
+    block_pattern = re.compile(r'```\s*\n(?:ID:|RULE:)[\s\S]*?```', re.MULTILINE)
+    entries = block_pattern.findall(content)
+
+    if len(entries) <= max_entries:
+        return content, 0  # Nichts zu tun
+
+    # Splits: header, [entries...], footer
+    first_match = block_pattern.search(content)
+    header = content[:first_match.start()] if first_match else ""
+    last_match = list(block_pattern.finditer(content))[-1]
+    footer = content[last_match.end():]
+
+    # Sortiere nach Priorität (P1 sichern, dann P2, dann P3)
+    p1 = [e for e in entries if get_priority(e) == 1]
+    p2 = [e for e in entries if get_priority(e) == 2]
+    p3 = [e for e in entries if get_priority(e) == 3]
+
+    kept = list(p1)  # P1: immer behalten
+    remaining = max_entries - len(kept)
+
+    # P2: neueste behalten (Ende der Liste = neueste)
+    if remaining > 0:
+        kept += p2[-remaining:] if len(p2) > remaining else p2
+        remaining = max_entries - len(kept)
+
+    # P3: nur wenn noch Platz
+    if remaining > 0:
+        kept += p3[-remaining:] if len(p3) > remaining else p3
+
+    removed = len(entries) - len(kept)
+    new_content = header + "\n".join(kept) + footer
+    return new_content, removed
+
+for fname, max_entries in knowledge_files.items():
+    fpath = ctx / fname
+    if not fpath.exists():
+        continue
+    content = fpath.read_text(encoding="utf-8")
+    new_content, removed = priority_trim(content, max_entries, fname)
+    if removed > 0:
+        fpath.write_text(new_content, encoding="utf-8")
+        print(f"  Trim {fname}: {removed} P3/P2-Einträge entfernt (P1 erhalten)")
+
+# _temp_notes.md: Recent Changes max 5 (unverändert)
+temp_path = ctx / "_temp_notes.md"
+if temp_path.exists():
+    content = temp_path.read_text(encoding="utf-8")
+    lines = content.splitlines()
+    in_changes = False
+    change_lines = []
+    other_lines = []
+    for line in lines:
+        if "Recent Changes" in line:
+            in_changes = True
+            other_lines.append(line)
+        elif in_changes and re.match(r'^\[20\d\d-', line.strip()):
+            change_lines.append(line)
+        elif in_changes and line.startswith("## "):
+            in_changes = False
+            other_lines.append(line)
+        else:
+            other_lines.append(line)
+    if len(change_lines) > 5:
+        result = []
+        for line in other_lines:
+            result.append(line)
+            if "Recent Changes" in line:
+                result.extend(change_lines[-5:])
+        temp_path.write_text("\n".join(result) + "\n", encoding="utf-8")
+PYEOF
+
+# ---- Schubladen-Check (Overflow-Management) ----
+DRAWER_SCRIPT="$CONTEXT_DIR/scripts/ai-context-drawer.sh"
+[ -f "$DRAWER_SCRIPT" ] && bash "$DRAWER_SCRIPT" > /dev/null 2>&1 || true
+
+# ---- Registry v6.0: Aktualisieren + RAG-Cache-Invalidierung ----
+REGISTRY_SCRIPT="$CONTEXT_DIR/scripts/ai-context-registry.sh"
+REGISTRY_FILE="$CONTEXT_DIR/registry.yaml"
+RAG_CACHE_SCRIPT="$CONTEXT_DIR/scripts/ai-rag-cache.sh"
+if [ -f "$REGISTRY_SCRIPT" ] && [ -f "$REGISTRY_FILE" ]; then
+
+  # Alte Chunk-Hashes vor --scan merken (für Cache-Invalidierung)
+  OLD_HASHES=""
+  if [ -f "$REGISTRY_FILE" ]; then
+    OLD_HASHES=$(grep 'hash:' "$REGISTRY_FILE" | sed "s/.*hash:[ ]*//;s/['\"]//g" | sort || true)
+  fi
+
+  # Neue ID:-Blöcke verankern, dann Registry neu einlesen
+  bash "$REGISTRY_SCRIPT" --add-anchors > /dev/null 2>&1 || true
+  bash "$REGISTRY_SCRIPT" --scan > /dev/null 2>&1 || true
+
+  # Neue Hashes ermitteln; nur geänderte invalidieren
+  if [ -f "$REGISTRY_FILE" ] && [ -f "$RAG_CACHE_SCRIPT" ]; then
+    NEW_HASHES=$(grep 'hash:' "$REGISTRY_FILE" | sed "s/.*hash:[ ]*//;s/['\"]//g" | sort || true)
+    # Hashes die in OLD_HASHES aber nicht in NEW_HASHES sind → invalidieren
+    while IFS= read -r old_hash; do
+      [ -z "$old_hash" ] && continue
+      # Präfix "sha1:" aus dem Hash-Wert entfernen für den Vergleich
+      hash_val="${old_hash#sha1:}"
+      if ! printf '%s\n' "$NEW_HASHES" | grep -qF "$hash_val"; then
+        bash "$RAG_CACHE_SCRIPT" --invalidate "$old_hash" > /dev/null 2>&1 || true
+      fi
+    done <<< "$OLD_HASHES"
+  fi
+fi
+
+# ---- Interaction Map regenerieren (v6.5 — bei UI-Änderungen) ----
+if echo "$CHANGED" | grep -qiE '\.(tsx|jsx|vue|svelte)$|src/components/|src/app/|src/pages/'; then
+  MAP_SCRIPT="$CONTEXT_DIR/scripts/ai-context-map.sh"
+  [ -f "$MAP_SCRIPT" ] && bash "$MAP_SCRIPT" > /dev/null 2>&1 || true
+fi
+
+# ---- Cross-Projekt-Transfer: neue Chunks an andere Projekte verteilen (Pro only) ----
+if [ "$(cat "$HOME/.ai-context/edition" 2>/dev/null)" = "pro" ]; then
+  TRANSFER_SCRIPT="$CONTEXT_DIR/scripts/ai-context-transfer.sh"
+  [ -f "$TRANSFER_SCRIPT" ] && bash "$TRANSFER_SCRIPT" --detect > /dev/null 2>&1 || true
+fi
+
+# ---- Auto-regenerate _SESSION.md ----
+PREP_SCRIPT="$CONTEXT_DIR/scripts/ai-session-prep.sh"
+if [ -f "$PREP_SCRIPT" ]; then
+  bash "$PREP_SCRIPT" > /dev/null 2>&1 || true
+fi
+
+# ---- Output ----
+if [ ${#INVALIDATED[@]} -gt 0 ]; then
+  echo ""
+  echo -e "${CYAN}🔄 AI Context v5 — Auto-Invalidation:${NC}"
+  for item in "${INVALIDATED[@]}"; do
+    echo -e "   ${YELLOW}⚠  ${item}${NC}"
+  done
+  echo -e "   ${CYAN}_SESSION.md regeneriert${NC}"
+  echo ""
+fi
+
+exit 0

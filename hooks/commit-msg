@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# =============================================================================
+# commit-msg hook — Context Update Convention v5.1
+#
+# Wenn Commit-Message "context-update: datei.md" enthält,
+# wird diese Datei in den Domain-Indizes auf ✅ gesetzt.
+#
+# Beispiel: git commit -m "fix auth bug context-update: backend/auth.md"
+# =============================================================================
+
+CONTEXT_DIR="./_ai_context"
+COMMIT_MSG_FILE="$1"
+
+[ ! -d "$CONTEXT_DIR" ] && exit 0
+[ ! -f "$COMMIT_MSG_FILE" ] && exit 0
+
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+TODAY=$(date +"%Y-%m-%d")
+GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+
+UPDATES=$(echo "$COMMIT_MSG" | grep -i "context-update:" | sed 's/.*context-update:\s*//')
+[ -z "$UPDATES" ] && exit 0
+
+REFRESHED=()
+
+while IFS= read -r file; do
+  file=$(echo "$file" | tr -d '[:space:]')
+  [ -z "$file" ] && continue
+  full_path="$CONTEXT_DIR/$file"
+  [ ! -f "$full_path" ] && continue
+
+  escaped_file=$(echo "$file" | sed 's/\//\\\//g')
+
+  # Update domain indexes (_idx/*.md)
+  for idx_file in "$CONTEXT_DIR"/_idx/*.md 2>/dev/null; do
+    [ ! -f "$idx_file" ] && continue
+    sed -i.bak "s/| \`${escaped_file}\` | ❌ /| \`${escaped_file}\` | ✅ /" "$idx_file" 2>/dev/null
+    sed -i.bak "s/| \`${escaped_file}\` | ⚠️ /| \`${escaped_file}\` | ✅ /" "$idx_file" 2>/dev/null
+    rm -f "${idx_file}.bak"
+  done
+
+  # Fallback: _ai_index.md (v5.0 compat)
+  index_file="$CONTEXT_DIR/_ai_index.md"
+  if [ -f "$index_file" ]; then
+    sed -i.bak "s/| \`${escaped_file}\` | ❌ /| \`${escaped_file}\` | ✅ /" "$index_file" 2>/dev/null
+    sed -i.bak "s/| \`${escaped_file}\` | ⚠️ /| \`${escaped_file}\` | ✅ /" "$index_file" 2>/dev/null
+    rm -f "${index_file}.bak"
+  fi
+
+  REFRESHED+=("$file")
+done <<< "$UPDATES"
+
+if [ ${#REFRESHED[@]} -gt 0 ]; then
+  echo ""
+  echo -e "${CYAN}✅ AI Context Refreshed:${NC}"
+  for item in "${REFRESHED[@]}"; do
+    echo -e "   ${GREEN}✅ ${item}${NC}"
+  done
+  echo ""
+fi
+
+exit 0

@@ -181,21 +181,33 @@ else:
 print()
 
 # ------------------------------------------------- Lese-Empfehlung
+# to_read: list[(file, line|None)] — Zeile durchreichen für Editor-Sprung
 to_read = []
+seen = set()
 for s, r in map_hits:
-    f = r['loc'].split(':')[0]
-    if f and f not in to_read:
-        to_read.append(f)
+    file_part, _, line_part = r['loc'].partition(':')
+    line_no = int(line_part) if line_part.isdigit() else None
+    if file_part and file_part not in seen:
+        to_read.append((file_part, line_no))
+        seen.add(file_part)
 for s, c in debug_hits:
-    for f in re.split(r'[,\s]+', c['files']):
-        f = f.strip()
-        if f and '.' in f and f not in to_read:
-            to_read.append(f)
+    for tok in re.split(r'[,\s]+', c['files']):
+        tok = tok.strip()
+        if not tok or '.' not in tok:
+            continue
+        file_part, _, line_part = tok.partition(':')
+        line_no = int(line_part) if line_part.isdigit() else None
+        if file_part and file_part not in seen:
+            to_read.append((file_part, line_no))
+            seen.add(file_part)
 
 print('EMPFOHLEN ZU LESEN (in dieser Reihenfolge):')
 if to_read:
-    for f in to_read[:5]:
-        print(f'  - {f}')
+    for file_part, line_no in to_read[:5]:
+        if line_no is not None:
+            print(f'  - {file_part}:{line_no}')
+        else:
+            print(f'  - {file_part}')
 else:
     print('  - (kein eindeutiger Verdächtiger — _interaction_map.md manuell prüfen)')
 
@@ -211,7 +223,7 @@ if graph_path and graph_path.exists() and to_read:
             raw = gs.split(':', 1)[1].strip().strip('[]')
             g_edges[g_cur] = [x.strip() for x in raw.split(',') if x.strip()]
             g_cur = None
-    cochange = [(f, g_edges[f]) for f in to_read if g_edges.get(f)]
+    cochange = [(f, g_edges[f]) for f, _ in to_read if g_edges.get(f)]
     if cochange:
         print()
         print('HÄUFIG MIT-BETROFFEN (gelernt aus früheren Fixes):')
@@ -220,7 +232,7 @@ if graph_path and graph_path.exists() and to_read:
 
 # Maschinenlesbarer Marker für das Skill
 print()
-print('__ROUTER__:' + ('|'.join(to_read[:5]) if to_read else 'none'))
+print('__ROUTER__:' + ('|'.join(f for f, _ in to_read[:5]) if to_read else 'none'))
 PYEOF
 
 python3 "$ROUTER_PY" "$CONTEXT_DIR" "$QUERY" "$IMPACT_GRAPH"

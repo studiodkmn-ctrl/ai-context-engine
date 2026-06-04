@@ -12,3 +12,6 @@ _ai_context/registry.yaml
 
 # Backup files
 *.bak
+
+# Projekt-Identitaet (Cache, wird pro Projekt regeneriert)
+_ai_context/.meta.json

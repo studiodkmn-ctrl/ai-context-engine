@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ai-context": {
+      "command": "node",
+      "args": ["${HOME}/.ai-context/mcp/dist/server.js"]
+    }
+  }
+}

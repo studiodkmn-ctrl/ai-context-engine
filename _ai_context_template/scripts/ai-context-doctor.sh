@@ -233,6 +233,24 @@ if oversized:
 else:
     emit('oversize', 'PASS', 'NONE', 'alle Dateien im Token-Rahmen')
 
+# ============= Check 8b: Session-Datum veraltet ============================
+# Liest "Session: YYYY-MM-DD" aus _ai_index.md und warnt wenn > 14 Tage alt.
+import datetime
+idx_path = ctx / '_ai_index.md'
+if idx_path.exists():
+    m = re.search(r'Session:\s*(\d{4}-\d{2}-\d{2})', idx_path.read_text(encoding='utf-8', errors='ignore'))
+    if m:
+        try:
+            session_date = datetime.date.fromisoformat(m.group(1))
+            age = (datetime.date.today() - session_date).days
+            if age > 14:
+                emit('stalesession', 'WARN', 'MECH',
+                     f'Session-Kontext {age} Tage alt (letzte Session: {m.group(1)}) — ai-session-prep.sh ausführen')
+            else:
+                emit('stalesession', 'PASS', 'NONE', f'Session-Kontext aktuell ({age} Tage)')
+        except ValueError:
+            pass
+
 # ============= Check 9: Symbol-Drift (semantische Verjaehrung) =============
 # Fuer jeden Gotcha/Pattern mit @-Datei-Referenz: pruefen ob im Body genannte
 # Identifier (camelCase/snake_case-Tokens) noch via `git grep -w` im Projekt
@@ -400,6 +418,11 @@ apply_mechanical_fixes() {
   fi
   if grep -q '^CHECK|mapdrift|WARN' "$REPORT" && [ -f "$map" ]; then
     bash "$map" > /dev/null 2>&1
+    fixed=$((fixed + 1))
+  fi
+  local prep="$SCRIPT_DIR/ai-session-prep.sh"
+  if grep -q '^CHECK|stalesession|WARN' "$REPORT" && [ -f "$prep" ]; then
+    bash "$prep" > /dev/null 2>&1
     fixed=$((fixed + 1))
   fi
   echo "$fixed"

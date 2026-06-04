@@ -15,6 +15,7 @@
 #   - Index ↔ Datei         (für Claude)
 #   - Übergroße Dateien     (für Claude)
 #   - Regel-Konflikte       (für Claude — via check_context_hash.sh)
+#   - Script-Drift (W7)     (für Claude — Projekt-Kopie ↔ globales Template)
 #
 # Usage:
 #   bash ai-context-doctor.sh            # --check: Health-Report (exit 0/1)
@@ -333,6 +334,13 @@ for cid, status, fixkind, msg, details in results:
         print(f'DETAIL|{cid}|{d}')
 PYEOF
 
+# macOS/Linux-portabler Datei-Hash (md5sum | md5).
+portable_hash() {
+  md5sum "$1" 2>/dev/null | cut -d' ' -f1 \
+    || md5 -q "$1" 2>/dev/null \
+    || echo "n/a"
+}
+
 # ---- Checks ausführen → REPORT ----
 run_checks() {
   : > "$REPORT"
@@ -349,6 +357,33 @@ run_checks() {
       n="$(echo "$cout" | grep -oE '[0-9]+ potentielle' | grep -oE '[0-9]+' | head -1)"
       echo "CHECK|conflicts|WARN|CLAUDE|${n:-?} potentielle Regel-Konflikte" >> "$REPORT"
       echo "$cout" | grep -E '↔|→' | sed 's/^/DETAIL|conflicts|/' >> "$REPORT"
+    fi
+  fi
+
+  # Check 9 (W7): Script-Drift — Projekt-Kopie ↔ globales Template.
+  # Warnt, wenn die zwei Script-Kopien auseinanderlaufen (Template aktualisiert,
+  # Projekt nicht — oder umgekehrt). Übersprungen, wenn kein globales Template da.
+  local tmpl_scripts="$HOME/.ai-context/_ai_context_template/scripts"
+  if [ -d "$tmpl_scripts" ] && [ -d "$SCRIPT_DIR" ]; then
+    local drifted=()
+    local f base tmpl
+    for f in "$SCRIPT_DIR"/*.sh; do
+      [ -f "$f" ] || continue
+      base="$(basename "$f")"
+      tmpl="$tmpl_scripts/$base"
+      [ -f "$tmpl" ] || continue   # nur gemeinsame Scripts vergleichen
+      if [ "$(portable_hash "$f")" != "$(portable_hash "$tmpl")" ]; then
+        drifted+=("$base")
+      fi
+    done
+    if [ ${#drifted[@]} -gt 0 ]; then
+      echo "CHECK|scriptdrift|WARN|CLAUDE|${#drifted[@]} Script(s) weichen vom globalen Template ab" >> "$REPORT"
+      local d
+      for d in "${drifted[@]}"; do
+        echo "DETAIL|scriptdrift|$d — sync via: cp ~/.ai-context/_ai_context_template/scripts/$d $SCRIPT_DIR/$d" >> "$REPORT"
+      done
+    else
+      echo "CHECK|scriptdrift|PASS|NONE|Scripts ↔ Template synchron" >> "$REPORT"
     fi
   fi
 }

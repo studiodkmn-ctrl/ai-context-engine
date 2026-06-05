@@ -54,6 +54,21 @@ cp "$SCRIPT_DIR/CLAUDE.md" "$INSTALL_DIR/"
 [ -f "$SCRIPT_DIR/context_manager_agent.py" ] && cp "$SCRIPT_DIR/context_manager_agent.py" "$INSTALL_DIR/"
 [ -f "$SCRIPT_DIR/ai-anon.sh" ] && cp "$SCRIPT_DIR/ai-anon.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/ai-anon.sh"
 
+# ---- MCP-Server (Phase 2): kopieren + bauen ----
+if [ -d "$SCRIPT_DIR/mcp" ]; then
+  rm -rf "$INSTALL_DIR/mcp"
+  mkdir -p "$INSTALL_DIR/mcp"
+  cp -r "$SCRIPT_DIR/mcp/src" "$SCRIPT_DIR/mcp/package.json" "$SCRIPT_DIR/mcp/tsconfig.json" "$INSTALL_DIR/mcp/" 2>/dev/null
+  [ -d "$SCRIPT_DIR/mcp/test" ] && cp -r "$SCRIPT_DIR/mcp/test" "$INSTALL_DIR/mcp/"
+  if command -v npm > /dev/null 2>&1; then
+    ( cd "$INSTALL_DIR/mcp" && npm install --silent && npm run build --silent ) \
+      && printf '   ✓ MCP-Server gebaut (~/.ai-context/mcp/dist/server.js)\n' \
+      || printf '   ⚠ MCP-Build fehlgeschlagen — manuell: cd ~/.ai-context/mcp && npm install && npm run build\n'
+  else
+    printf '   ⚠ npm fehlt — MCP-Server nicht gebaut. Node 18+ installieren, dann: cd ~/.ai-context/mcp && npm install && npm run build\n'
+  fi
+fi
+
 chmod +x "$INSTALL_DIR/setup_ai_context.sh"
 find "$INSTALL_DIR/_ai_context_template/scripts" -name "*.sh" -exec chmod +x {} \;
 chmod +x "$INSTALL_DIR/_ai_context_template/check_context_hash.sh"

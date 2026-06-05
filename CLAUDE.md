@@ -11,6 +11,18 @@
 
 > Fehlt _SESSION.md? → `bash _ai_context/scripts/ai-session-prep.sh`
 
+## Gedächtnis zuerst (MCP)
+```
+Bevor du Dateien liest, frage das Gedächtnis:
+  memory_search("<begriffe>")   → relevante Schnipsel, auch aus anderen Projekten
+  session_context()             → kompakter Projektkontext (statt 4 Dateien)
+Lies Dateien nur, wenn die Suche nichts liefert.
+Neue Erkenntnisse festhalten:
+  memory_save(content, type)    → type: gotcha|debug|security|decision|endpoint|auth|component|note
+capture_from_diff() läuft automatisch im post-commit-Hook — kein manuelles Lernen nötig.
+```
+> MCP-Server registriert in `.mcp.json`. Findet er nichts, fällt der Agent auf normales Dateilesen zurück.
+
 ## Kontext-Routing
 ```
 _ai_index.md (~150 Tok) → _idx/domain.md (~80 Tok) → datei.md (~200 Tok)

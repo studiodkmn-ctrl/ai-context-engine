@@ -15,6 +15,7 @@
 #   - Index ↔ Datei         (für Claude)
 #   - Übergroße Dateien     (für Claude)
 #   - Regel-Konflikte       (für Claude — via check_context_hash.sh)
+#   - Script-Drift (W7)     (für Claude — Projekt-Kopie ↔ globales Template)
 #
 # Usage:
 #   bash ai-context-doctor.sh            # --check: Health-Report (exit 0/1)
@@ -232,6 +233,24 @@ if oversized:
 else:
     emit('oversize', 'PASS', 'NONE', 'alle Dateien im Token-Rahmen')
 
+# ============= Check 8b: Session-Datum veraltet ============================
+# Liest "Session: YYYY-MM-DD" aus _ai_index.md und warnt wenn > 14 Tage alt.
+import datetime
+idx_path = ctx / '_ai_index.md'
+if idx_path.exists():
+    m = re.search(r'Session:\s*(\d{4}-\d{2}-\d{2})', idx_path.read_text(encoding='utf-8', errors='ignore'))
+    if m:
+        try:
+            session_date = datetime.date.fromisoformat(m.group(1))
+            age = (datetime.date.today() - session_date).days
+            if age > 14:
+                emit('stalesession', 'WARN', 'MECH',
+                     f'Session-Kontext {age} Tage alt (letzte Session: {m.group(1)}) — ai-session-prep.sh ausführen')
+            else:
+                emit('stalesession', 'PASS', 'NONE', f'Session-Kontext aktuell ({age} Tage)')
+        except ValueError:
+            pass
+
 # ============= Check 9: Symbol-Drift (semantische Verjaehrung) =============
 # Fuer jeden Gotcha/Pattern mit @-Datei-Referenz: pruefen ob im Body genannte
 # Identifier (camelCase/snake_case-Tokens) noch via `git grep -w` im Projekt
@@ -333,6 +352,13 @@ for cid, status, fixkind, msg, details in results:
         print(f'DETAIL|{cid}|{d}')
 PYEOF
 
+# macOS/Linux-portabler Datei-Hash (md5sum | md5).
+portable_hash() {
+  md5sum "$1" 2>/dev/null | cut -d' ' -f1 \
+    || md5 -q "$1" 2>/dev/null \
+    || echo "n/a"
+}
+
 # ---- Checks ausführen → REPORT ----
 run_checks() {
   : > "$REPORT"
@@ -351,6 +377,33 @@ run_checks() {
       echo "$cout" | grep -E '↔|→' | sed 's/^/DETAIL|conflicts|/' >> "$REPORT"
     fi
   fi
+
+  # Check 9 (W7): Script-Drift — Projekt-Kopie ↔ globales Template.
+  # Warnt, wenn die zwei Script-Kopien auseinanderlaufen (Template aktualisiert,
+  # Projekt nicht — oder umgekehrt). Übersprungen, wenn kein globales Template da.
+  local tmpl_scripts="$HOME/.ai-context/_ai_context_template/scripts"
+  if [ -d "$tmpl_scripts" ] && [ -d "$SCRIPT_DIR" ]; then
+    local drifted=()
+    local f base tmpl
+    for f in "$SCRIPT_DIR"/*.sh; do
+      [ -f "$f" ] || continue
+      base="$(basename "$f")"
+      tmpl="$tmpl_scripts/$base"
+      [ -f "$tmpl" ] || continue   # nur gemeinsame Scripts vergleichen
+      if [ "$(portable_hash "$f")" != "$(portable_hash "$tmpl")" ]; then
+        drifted+=("$base")
+      fi
+    done
+    if [ ${#drifted[@]} -gt 0 ]; then
+      echo "CHECK|scriptdrift|WARN|CLAUDE|${#drifted[@]} Script(s) weichen vom globalen Template ab" >> "$REPORT"
+      local d
+      for d in "${drifted[@]}"; do
+        echo "DETAIL|scriptdrift|$d — sync via: cp ~/.ai-context/_ai_context_template/scripts/$d $SCRIPT_DIR/$d" >> "$REPORT"
+      done
+    else
+      echo "CHECK|scriptdrift|PASS|NONE|Scripts ↔ Template synchron" >> "$REPORT"
+    fi
+  fi
 }
 
 # ---- mechanische Fixes ----
@@ -365,6 +418,11 @@ apply_mechanical_fixes() {
   fi
   if grep -q '^CHECK|mapdrift|WARN' "$REPORT" && [ -f "$map" ]; then
     bash "$map" > /dev/null 2>&1
+    fixed=$((fixed + 1))
+  fi
+  local prep="$SCRIPT_DIR/ai-session-prep.sh"
+  if grep -q '^CHECK|stalesession|WARN' "$REPORT" && [ -f "$prep" ]; then
+    bash "$prep" > /dev/null 2>&1
     fixed=$((fixed + 1))
   fi
   echo "$fixed"

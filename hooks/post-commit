@@ -286,6 +286,14 @@ if [ -f "$PREP_SCRIPT" ]; then
   bash "$PREP_SCRIPT" > /dev/null 2>&1 || true
 fi
 
+# ---- MCP Auto-Capture (Phase 2): Wissen aus dem Commit-Diff ins Gedächtnis ----
+# Schlanke CLI statt MCP-Handshake. Bricht den Commit nie ab (|| true).
+CAPTURE_CLI="$HOME/.ai-context/mcp/dist/capture-cli.js"
+if [ -f "$CAPTURE_CLI" ] && command -v node > /dev/null 2>&1; then
+  ( cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" \
+      && node "$CAPTURE_CLI" --apply "HEAD~1..HEAD" ) > /dev/null 2>&1 || true
+fi
+
 # ---- Output ----
 if [ ${#INVALIDATED[@]} -gt 0 ]; then
   echo ""

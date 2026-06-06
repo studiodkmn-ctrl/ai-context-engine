@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { execFileSync } from 'node:child_process';
-import { findProjectRoot } from '../lib/paths.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { findProjectRoot, localContextDir } from '../lib/paths.js';
 import { saveFact, FactType } from '../lib/save.js';
 
 interface Suggestion {
@@ -31,7 +34,13 @@ export const captureFromDiffTool = {
       return text('Kein git-diff verfügbar (kein Repo oder keine Änderungen).');
     }
 
-    const suggestions = analyze(diff);
+    const intentSuggestion = readCommitIntent(root);
+    const suggestions = [
+      ...analyze(diff),
+      ...detectGaps(diff, root),
+      ...checkInvariants(diff, root),
+      ...(intentSuggestion ? [intentSuggestion] : []),
+    ];
     if (suggestions.length === 0) {
       return text('Keine eindeutigen Erkenntnisse im Diff gefunden.');
     }
@@ -120,6 +129,165 @@ function analyze(diff: string): Suggestion[] {
   }
   return out.slice(0, 5);
 }
+
+// ── Gap-Detection ────────────────────────────────────────────────────────────
+
+function extractChangedFiles(diff: string): Set<string> {
+  const files = new Set<string>();
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+++ b/')) files.add(line.slice(6).trim());
+  }
+  return files;
+}
+
+function loadImpactGraph(root: string): Map<string, string[]> {
+  const projectName = path.basename(root);
+  const graphPath = path.join(os.homedir(), '.ai-context', 'projects', projectName, 'impact-graph.yaml');
+  const graph = new Map<string, string[]>();
+  try {
+    const content = fs.readFileSync(graphPath, 'utf8');
+    let currentSource = '';
+    for (const line of content.split('\n')) {
+      const src = /^\s*-\s*source:\s*(.+)/.exec(line);
+      if (src) { currentSource = src[1].trim(); continue; }
+      const aff = /^\s*affects:\s*\[(.+)\]/.exec(line);
+      if (aff && currentSource) {
+        graph.set(currentSource, aff[1].split(',').map(s => s.trim()).filter(Boolean));
+        currentSource = '';
+      }
+    }
+  } catch { /* kein Graph vorhanden */ }
+  return graph;
+}
+
+/** Vergleicht geänderte Dateien gegen den Impact Graph und meldet fehlende Co-Changes. */
+function detectGaps(diff: string, root: string): Suggestion[] {
+  const graph = loadImpactGraph(root);
+  if (graph.size === 0) return [];
+
+  const changed = extractChangedFiles(diff);
+  const warnings: Suggestion[] = [];
+  const seen = new Set<string>();
+
+  for (const file of changed) {
+    const expected = graph.get(file);
+    if (!expected || expected.length < 2) continue;
+    const missing = expected.filter(f => !changed.has(f));
+    if (missing.length < 2) continue;
+    const key = `gap|${file}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    warnings.push({
+      type: 'gotcha',
+      content: `Unvollständige Änderung? ${file} — typisch mitgeändert: ${missing.join(', ')} (${expected.length}× zusammen in Vergangenheit)`,
+    });
+  }
+  return warnings;
+}
+
+// ── Invariant Layer ───────────────────────────────────────────────────────────
+
+interface InvariantDep {
+  type: 'file' | 'function' | 'endpoint';
+  ref: string;
+}
+
+interface Invariant {
+  id: string;
+  level: 'hard' | 'soft' | 'hint';
+  rule: string;
+  scope: string;
+  depends: InvariantDep[];
+}
+
+/** Lädt invariants.yaml aus dem _ai_context-Ordner. Kein Fehler wenn nicht vorhanden. */
+function loadInvariants(root: string): Invariant[] {
+  const invPath = path.join(localContextDir(root), 'invariants.yaml');
+  const result: Invariant[] = [];
+  try {
+    const lines = fs.readFileSync(invPath, 'utf8').split('\n');
+    let cur: Partial<Invariant> & { depends: InvariantDep[] } = { depends: [] };
+
+    const flush = () => {
+      if (cur.id) {
+        result.push({ id: cur.id, level: cur.level ?? 'hint', rule: cur.rule ?? '', scope: cur.scope ?? '*', depends: cur.depends });
+      }
+      cur = { depends: [] };
+    };
+
+    for (const line of lines) {
+      const id   = /^\s+-\s+id:\s*(.+)/.exec(line);
+      if (id)   { flush(); cur.id = id[1].trim(); continue; }
+
+      const lvl  = /^\s+level:\s*(\w+)/.exec(line);
+      if (lvl)  { cur.level  = lvl[1].trim() as Invariant['level']; continue; }
+
+      const rule = /^\s+rule:\s*"([^"]+)"/.exec(line);
+      if (rule) { cur.rule   = rule[1]; continue; }
+
+      const scp  = /^\s+scope:\s*"([^"]+)"/.exec(line);
+      if (scp)  { cur.scope  = scp[1]; continue; }
+
+      // depends: ["file1", "file2"]  (inline array format)
+      const deps = /^\s+depends:\s*\[(.+)\]/.exec(line);
+      if (deps) {
+        const refs = [...deps[1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+        for (const ref of refs) cur.depends.push({ type: 'file', ref });
+      }
+    }
+    flush();
+  } catch { /* invariants.yaml fehlt — kein Problem */ }
+  return result;
+}
+
+/** Prüft ob geänderte Dateien Invarianten berühren und gibt Warnungen zurück. */
+function checkInvariants(diff: string, root: string): Suggestion[] {
+  const invariants = loadInvariants(root);
+  if (invariants.length === 0) return [];
+
+  const changed = extractChangedFiles(diff);
+  const warnings: Suggestion[] = [];
+  const seen = new Set<string>();
+
+  for (const file of changed) {
+    const base = path.basename(file);
+    for (const inv of invariants) {
+      if (seen.has(inv.id)) continue;
+      const affected = inv.depends.some(d =>
+        d.type === 'file' && (file.endsWith(d.ref) || d.ref.endsWith(base) || d.ref.includes(base))
+      );
+      if (!affected) continue;
+      seen.add(inv.id);
+
+      const factType: FactType = inv.level === 'hard' ? 'security' : 'gotcha';
+      const badge = inv.level === 'hard' ? '⚠ INVARIANTE' : inv.level === 'soft' ? 'Invariante' : 'Hinweis';
+      warnings.push({
+        type: factType,
+        content: `${badge} [${inv.id}] ${inv.rule}  (scope: ${inv.scope})`,
+      });
+    }
+  }
+  return warnings;
+}
+
+// ── Intent-Tagging ────────────────────────────────────────────────────────────
+
+/** Liest den letzten Commit-Titel und speichert ihn als Intent wenn er bedeutsam ist. */
+function readCommitIntent(root: string): Suggestion | null {
+  try {
+    const msg = execFileSync('git', ['log', '-1', '--format=%s'], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 5_000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (!msg || msg.length < 10) return null;
+    if (!/\b(add|feat|implement|refactor|fix|remove|migrate|upgrade|extract)\b/i.test(msg)) return null;
+    return { type: 'note', content: `Intent: ${msg}` };
+  } catch { return null; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function text(t: string) {
   return { content: [{ type: 'text' as const, text: t }] };

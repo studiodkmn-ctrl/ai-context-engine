@@ -1,0 +1,50 @@
+# AI Context Invariants v1.0
+# Manuell gepflegt — NICHT durch ai-context-registry.sh überschrieben.
+# Bootstrapped aus security.md P1/P2 Einträgen.
+#
+# level:  hard (P1, System bricht) | soft (P2, Warning) | hint (P3, Hinweis)
+# scope:  Glob-Pattern wo die Invariante gilt
+# depends: Dateien die diese Invariante implementieren/berühren
+# source: wo die Regel herkam
+#
+# Neue Einträge: manuell hinzufügen ODER via capture_from_diff (apply=true)
+# wenn P1-Bug gefixt wurde.
+
+version: "1.0"
+updated: "2026-06-06"
+
+invariants:
+  - id: auth_first
+    level: hard
+    rule: "Auth-Check muss vor jeder state-ändernden Route stehen (POST/PUT/PATCH/DELETE)"
+    scope: "src/app/api/**"
+    depends: ["src/lib/auth.ts", "src/middleware.ts"]
+    source: "security.md#auth_first"
+
+  - id: no_secret_frontend
+    level: hard
+    rule: "Keine Secrets in Client-Komponenten oder public API Responses"
+    scope: "src/**"
+    depends: ["src/lib/auth.ts"]
+    source: "security.md#no_secret_frontend"
+
+  - id: scope_to_user
+    level: soft
+    rule: "DB-Queries müssen auf aktiven User beschränkt sein (where: { userId })"
+    scope: "src/app/api/**"
+    depends: ["src/lib/prisma.ts", "src/lib/auth.ts"]
+    source: "security.md#scope_to_user"
+
+  - id: input_validation
+    level: soft
+    rule: "User-Input muss vor Verarbeitung validiert werden (schema.safeParse)"
+    scope: "src/app/api/**"
+    depends: ["src/lib/prisma.ts"]
+    source: "security.md#input_validation"
+
+  - id: prisma_singleton
+    level: soft
+    rule: "Prisma-Client nur als Singleton (src/lib/prisma.ts) — kein new PrismaClient() in Komponenten"
+    scope: "src/**"
+    depends: ["src/lib/prisma.ts"]
+    source: "_gotchas.md#prisma_singleton"

@@ -171,12 +171,45 @@ def walk_files():
 files = walk_files()
 results = {}
 total_syms = 0
+file_contents = {}
 
 for rel, p in files:
+    try:
+        content = p.read_text(encoding='utf-8', errors='replace')
+    except Exception:
+        content = ''
+    file_contents[str(rel)] = content
     syms = extract_symbols(p)
     if syms:
         results[str(rel)] = syms
         total_syms += len(syms)
+
+# ── Usage Scan: welche Dateien rufen welche Symbole auf? ─────────────────────
+MAX_CALLERS = 5
+MIN_NAME_LEN = 4  # Kurze Namen (len, get, run) erzeugen zu viele False Positives
+
+# Definitionsdatei pro Symbol
+defining = {}
+for rel_path, syms in results.items():
+    for lineno, name, sig, desc in syms:
+        defining[name] = rel_path
+
+# Für jedes Symbol: Dateien finden die es aufrufen (nicht definieren)
+usage_map = {}
+for name, def_file in defining.items():
+    if len(name) < MIN_NAME_LEN:
+        continue
+    pat = re.compile(r'\b' + re.escape(name) + r'\s*[\(.]')
+    callers = []
+    for rel_path, content in file_contents.items():
+        if rel_path == def_file:
+            continue
+        if len(callers) >= MAX_CALLERS:
+            break
+        if pat.search(content):
+            callers.append(rel_path)
+    if callers:
+        usage_map[name] = callers
 
 # Output format
 print(f"FILES:{len(results)} SYMBOLS:{total_syms}")
@@ -193,6 +226,9 @@ for rel_path, syms in sorted(results.items()):
         else:
             desc_part = ""
         print(f"  SYM:{lineno}:{name}:{desc_part}")
+        callers = usage_map.get(name, [])
+        if callers:
+            print(f"  USED:{name}:{','.join(callers)}")
 PYEOF
 
 output=$(python3 "$EXTRACTOR" "$PROJECT_DIR" 2>/dev/null)
@@ -226,6 +262,12 @@ build_md() {
       desc="${rest2#*:}"
       # Align columns (name sauber, sig+comment in desc-Spalte)
       printf "  %-35s L%-6s%s\n" "$name" "$lineno" "$desc"
+    elif [[ "$line" == "  USED:"* ]]; then
+      rest="${line#  USED:}"
+      callers="${rest#*:}"
+      # Ersetze Kommas durch " · " für Lesbarkeit
+      callers_fmt="${callers//,/ · }"
+      printf "    → used in: %s\n" "$callers_fmt"
     fi
   done <<< "$output"
 }

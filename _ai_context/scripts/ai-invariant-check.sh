@@ -49,7 +49,24 @@ import sys, re, pathlib, os
 
 invariants_file = pathlib.Path(sys.argv[1])
 changed_files_raw = sys.argv[2]
+symbols_file = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 else None
 changed_files = [f.strip() for f in changed_files_raw.split('\n') if f.strip()]
+
+# Lade used_in aus symbols.md: defining_file → set(caller_files)
+# Format: ## `file.ts` → SYM-Zeile → USED-Zeile
+file_callers = {}  # defining_file_basename → set of caller files
+if symbols_file and symbols_file.exists():
+    current_section = None
+    for line in symbols_file.read_text(encoding='utf-8').splitlines():
+        sec_m = re.match(r'^## `(.+)`', line)
+        if sec_m:
+            current_section = sec_m.group(1)
+            if current_section not in file_callers:
+                file_callers[current_section] = set()
+        used_m = re.match(r'^\s+→ used in:\s*(.+)', line)
+        if used_m and current_section:
+            callers = [c.strip() for c in used_m.group(1).split('·') if c.strip()]
+            file_callers[current_section].update(callers)
 
 # Parse invariants.yaml
 invariants = []
@@ -103,10 +120,23 @@ for inv, files in hits:
     print(f"  Regel:  {inv['rule']}")
     print(f"  Scope:  {inv['scope']}")
     print(f"  Durch:  {', '.join(files[:3])}")
+    # Statische Verifikation: welche Dateien rufen die Dependency-Files auf?
+    # → Das sind die Enforcement-Points wo die Invariante geprüft werden muss
+    enforce_points = set()
+    for dep in inv['depends']:
+        if dep['type'] == 'file':
+            dep_key = dep['ref']  # z.B. "src/lib/auth.ts"
+            for section_path, callers in file_callers.items():
+                if dep_key.endswith(section_path) or section_path.endswith(dep_key) or dep_key in section_path:
+                    enforce_points.update(callers)
+    if enforce_points:
+        pts = sorted(enforce_points)[:4]
+        print(f"  Check:  {', '.join(pts)}")
     print()
 PYEOF
 
-result=$(python3 "$CHECK_PY" "$INVARIANTS_FILE" "$CHANGED" 2>/dev/null)
+SYMBOLS_FILE="$CONTEXT_DIR/_idx/symbols.md"
+result=$(python3 "$CHECK_PY" "$INVARIANTS_FILE" "$CHANGED" "$SYMBOLS_FILE" 2>/dev/null)
 
 if [ "$result" = "OK" ]; then
   echo -e "${GREEN}  ✅ Keine Invarianten berührt${NC}"

@@ -1,321 +1,270 @@
-# AI Context System v6.3
+# AI Context Engine
 
-Zero-touch context management for Claude Code — with built-in **local PII anonymization**, automatic stack detection, and semantic chunk search.
+**A pre-commit reasoning layer for AI coding agents.**
 
----
-
-## Why AI Context?
-
-Every time you start a Claude session, you have to re-explain your project. AI Context solves this automatically: it reads your codebase, builds a compressed session context, and loads it before Claude sees a single word you type.
-
-At the same time, **your sensitive business data never leaves your machine in raw form**. Names, amounts, IBANs, company names — all replaced locally before reaching Claude.
+> *"We don't make AI smarter. We give AI a memory of your system."*
 
 ---
 
-## What's new in v6.3
+Your codebase is not a collection of files.  
+It is a system of constraints, rules, and dependencies.  
+**AI Context Engine makes that system visible — before you commit.**
 
-| Feature | v5.x | v6.3 |
+```
+$ git commit -m "fix: update JWT validation"
+
+  AI Context Engine
+  ─────────────────────────────────────────────
+  ⚠  INVARIANT [auth_first]  (hard)
+     Auth-Check must precede all protected routes
+     scope: src/app/api/**
+     enforcement: middleware/auth.ts · api/users.ts
+
+  ⚠  Gap detected: src/lib/auth.ts
+     Typically changed together: middleware/auth.ts · login.tsx
+     (co-changed 4× in past — 2 missing from this commit)
+
+  ℹ  Intent: "fix JWT validation"
+     Concepts affected: authentication · session · security
+  ─────────────────────────────────────────────
+```
+
+---
+
+## Why this exists
+
+Modern AI coding tools fail at one thing:  
+They read code. They don't understand systems.
+
+| | Without AI Context | With AI Context |
 |---|---|---|
-| Installation | Single mode | **Simple** (default) + **Pro** (Ollama + RAG) |
-| IDE Integration | Terminal only | **Universal** (Terminal, VS Code, Cursor, JetBrains via SessionStart hook) |
-| Chunk Search | — | **Registry + semantic HTML anchors** |
-| RAG Cache | — | **Ollama Embeddings (nomic-embed-text)** |
-| Privacy Layer | — | **`ai-anon` — local anonymization before Claude** |
-| PII Guardrail | — | **UserPromptSubmit hook — raw PII is blocked before transmission** |
-| Multi-Session Stats | — | **Weekly/monthly token usage (`ai-stats`)** |
-| Behavior Rules | — | **`_SESSION.md` rules enforce Gotcha-Detection, Auto-Apply** |
-| Django/Python ORM | Basic | **Enhanced: models.py scan** |
-| macOS Compatibility | Partial | **Full (BSD tools)** |
-
----
-
-## Installation
-
-### Simple (default — no Ollama required)
-
-```bash
-git clone https://github.com/studiodkmn-ctrl/ai-context-v5.2.git
-cd ai-context-v5.2
-bash install.sh
-# Close and reopen your terminal
-```
-
-Includes: templates, registry, shell aliases, zero-touch `claude` wrapper, PII anonymization, block-mode safety hook.
-
-### Pro (+ Ollama + RAG Cache + Embeddings)
-
-```bash
-bash install.sh --pro
-```
-
-Includes everything in Simple, plus:
-- Ollama installation + `nomic-embed-text` model (~274 MB)
-- launchd/systemd auto-start
-- Semantic chunk search via embeddings
-- `ai-rag` and `ai-registry` commands
-
-> `--skip-ollama` is deprecated and will be ignored with a notice.
-
----
-
-## Privacy Protection — Two Layers
-
-This is the core feature. **Your company data stays on your machine.**
-
-### Layer A — Explicit Anonymization (`ap:`)
-
-Type `ap:` before any text containing real names, companies, amounts, or personal data. The system replaces everything locally, copies the anonymized version to your clipboard, and you paste it into Claude.
-
-```bash
-ap: Müller GmbH owes us $1,250 since 15.03.2026, invoice R-2024-088
-# Clipboard receives:
-#   [FIRMA_1] owes us $1,250 since [DAT_1], invoice R-2024-088
-```
-
-**Invoice mode (automatic):** When the text contains calculation keywords (*owes, costs, total, invoice, sum, VAT*), amounts are preserved so Claude can calculate. Only names, companies, and contact data are replaced.
-
-```bash
-ap: Peter Schmidt owes Müller GmbH $1,250 for invoice R-2024-088
-# → [P1] owes [FIRMA_1] $1,250 for invoice R-2024-088
-#   (amount stays — Claude can calculate; names are gone)
-```
-
-Then paste into Claude, get a full response using placeholders, copy the response, and run:
-
-```bash
-ar
-# Clipboard now has the original names restored — session map deleted
-```
-
-### Layer B — Automatic Block (Option C)
-
-If you forget `ap:` and type raw PII directly into Claude — an email, IBAN, phone number, a company name like "Müller GmbH", or an amount like "$50,000" — the **UserPromptSubmit hook** blocks the prompt completely before it reaches Claude:
-
-```
-🛑 Prompt blocked — sensitive data detected (Company, Amount).
-   Claude never saw your prompt.
-   → Re-enter with prefix: ap: <your text>
-```
-
-Claude never sees the raw data. The hook runs in **all Claude environments** (Terminal, VS Code, Cursor, JetBrains). If placeholders are already present in the prompt (`[P1]`, `[B1]` …), the hook passes through silently — Layer A already fired.
-
-### Placeholder Schema
-
-| Category | Placeholder | Example |
-|---|---|---|
-| Person | `[P1]`, `[P2]` | "Dr. Weber", "Max Mustermann" |
-| Location | `[ORT_1]` | "80331 Munich", "Main Street 5" |
-| Phone | `[TEL_1]` | "+49 30 1234567" |
-| E-Mail | `[MAIL_1]` | "weber@company.com" |
-| Amount | `[B1]` | "$50,000" *(preserved in invoice mode)* |
-| Date | `[DAT_1]` | "15.03.2026" |
-| Time | `[UHR_1]` | "14:30" |
-| IBAN | `[IBAN_1]` | "DE89 3704 0044 …" |
-| Company | `[FIRMA_1]` | "Müller GmbH" |
-| Project | `[PROJ_1]` | "Project Website Redesign" |
-
-Session maps are stored per day under `~/.ai-context/maps/session_YYYY-MM-DD.json`. After `ar`, the session file is **deleted** — sensitive mappings are never stored permanently.
-
-**Additional commands:**
-
-```bash
-ai-anon --show                  # display current mapping table
-ai-anon --clear                 # delete all session maps
-ai-anon --detect "text"         # exit 0=placeholders, 1=raw PII, 2=clean
-```
-
----
-
-## Daily Usage
-
-### Zero-Click (works everywhere)
-
-```bash
-cd my-project
-claude                          # _SESSION.md is generated automatically
-```
-
-v6.3 uses **two mechanisms** for universal integration:
-
-1. **SessionStart hook** in `.claude/settings.json` (project-local) and `~/.claude/settings.json` (global) — works in **all** Claude environments: Terminal, VS Code Claude Extension, Cursor, JetBrains.
-2. **Shell wrapper** `claude()` in `.zshrc`/`.bashrc` as a terminal fallback.
-
-Whether you type `claude` in the terminal or open the VS Code extension — context is ready before you type a word.
-
-### VS Code / Cursor / JetBrains
-
-After `ai-context-setup`, `.claude/settings.json` is in your project. Open the project in VS Code and the Claude extension triggers the SessionStart hook automatically:
-
-```
-🧠 AI Context: Preparing context...
-✅ Session ready (~310 tokens) — Domain: backend
-```
-
-### New Project Setup
-
-```bash
-ai-context-setup my-project
-```
-
-Creates `_ai_context/` with auto-detected stack (Next.js, Django, FastAPI, Go …).
-
-### Manual Commands
-
-```bash
-ai-prep                         # generate _SESSION.md manually
-ai-prep --task "Auth refactor"  # task-specific (uses RAG in Pro mode)
-ai-prep --full                  # all files inline
-
-ai-context-sync --export        # _SESSION.md → clipboard (for Claude.ai chat)
-ai-context-sync --list          # list all projects
-ai-context-sync --restore       # restore context from ~/.ai-context/
-
-ai-stats                        # token stats (last 7 days)
-ai-stats --month                # last 30 days
-ai-stats --all                  # all time
-```
-
----
-
-## Pro-only Features
-
-> Pro mode requires Ollama (`bash install.sh --pro`). Free to run locally — no cloud, no API costs.
-
-### Semantic Chunk Search
-
-```bash
-ai-registry --add-anchors       # set HTML anchors in context files
-ai-registry --scan              # build registry (registry.yaml)
-ai-registry --find 'auth'       # semantic keyword search
-```
-
-### RAG Cache (Ollama Embeddings)
-
-```bash
-ai-rag --stats                  # RAG cache statistics
-ai-rag --embed-chunks           # embed all chunks via Ollama
-ai-rag --find "JWT validation"  # semantic similarity search
-```
-
-When you run `ai-prep --task "Auth refactor"`, Pro mode automatically finds the most relevant chunks via embeddings and injects them into `_SESSION.md`. Cache is invalidated after every `git commit` via a post-commit hook.
+| Agent reads | entire files | structured graph |
+| Token usage | high | low |
+| Knows what breaks | no | yes, before commit |
+| Understands invariants | no | yes |
+| Learns from past bugs | no | yes (cross-session) |
 
 ---
 
 ## Architecture
 
-```
-~/.ai-context/                  ← Global store (installed)
-├── _ai_context_template/       ← Base templates for new projects
-├── hooks/
-│   └── pii-warn.sh             ← UserPromptSubmit block hook (global)
-├── ai-anon.sh                  ← Local anonymizer
-├── projects/                   ← Context mirror per project
-│   └── my-project/
-├── shared/
-│   ├── gotchas_global.md       ← Cross-project gotchas
-│   └── patterns_global.md      ← Debug patterns
-├── setup_ai_context.sh         ← Project setup script
-└── CLAUDE.md                   ← Global Claude instructions
-
-my-project/_ai_context/         ← Per-project (auto-generated)
-├── _SESSION.md                 ← AUTO-GENERATED — Claude reads this first
-├── _ai_index.md                ← Micro index (~150 tokens)
-├── _quick_facts.md             ← Permanent facts (stack, env, ports)
-├── registry.yaml               ← Chunk registry with HTML anchors [Pro]
-├── .rag_cache/                 ← Embedding cache [Pro]
-├── _idx/                       ← Domain indices (~80 tokens each)
-│   ├── frontend.md
-│   ├── backend.md
-│   ├── infra.md
-│   └── project.md
-├── _gotchas.md                 ← Technical traps (max 15)
-├── _temp_notes.md              ← Sprint/tasks (Recent Changes max 5)
-├── frontend/
-├── backend/
-├── architecture.md
-├── decisions.md
-├── debug_patterns.md
-├── security.md
-└── testing.md
-```
-
-### Context Routing (3 tiers)
+Five layers. Each one built on the previous.
 
 ```
-_ai_index.md (~150 tok) → _idx/domain.md (~80 tok) → file.md (~200 tok)
-Max 3 files per chain. Max 4 files per session.
+┌──────────────────────────────────────┐
+│            INTENT LAYER              │  ← WHY code changes
+│  Commit intent · Feature purpose     │
+├──────────────────────────────────────┤
+│           INVARIANT LAYER            │  ← WHAT must never break
+│  System rules · Security contracts   │
+├──────────────────────────────────────┤
+│            CHANGE GRAPH              │  ← HOW things affect each other
+│  Impact graph · Co-change patterns   │
+├──────────────────────────────────────┤
+│            SYMBOL GRAPH              │  ← WHERE things are
+│  Functions · Signatures · used_in    │
+├──────────────────────────────────────┤
+│             CODE BASE                │  ← WHAT exists
+│  Files · Interfaces · Types          │
+└──────────────────────────────────────┘
 ```
 
 ---
 
-## Supported Stacks (20+)
+## Key Capabilities
 
-| Category | Frameworks |
-|---|---|
-| JavaScript/TypeScript | Next.js, Nuxt, React, Vue, Svelte, Angular, Astro, Remix, Express, Fastify, NestJS, Hono |
-| Python | Django, FastAPI, Flask, LangChain, Claude API |
-| Rust | Actix, Axum |
-| Go | Standard + Gin, Echo |
-| Other | Ruby/Rails, Java/Spring, PHP/Laravel, Flutter/Dart |
-| Infra | Docker, Terraform |
+### 1. Invariant Engine
+Define rules that must never break. The engine checks every commit.
 
-Django projects are detected via `manage.py` + `models.py` scan. Frontend directories are not created for pure backend projects.
+```yaml
+# _ai_context/invariants.yaml
+invariants:
+  - id: auth_first
+    level: hard
+    rule: "Auth must be validated before protected routes"
+    scope: "src/app/api/**"
+    depends: ["src/lib/auth.ts", "src/middleware.ts"]
+```
+
+When `auth.ts` is changed → instant warning with enforcement points.
+
+### 2. Symbol Map with Signatures and Callers
+
+```
+validateJWT            L342   (token: string): User | null
+  → used in: middleware/auth.ts · api/users.ts · api/admin.ts
+
+saveFact               L43    (root, type, content, priority): SaveResult
+  → used in: capture_from_diff.ts · memory_save.ts
+```
+
+Navigate any codebase in seconds. No full file reads.
+
+### 3. Impact Graph — Learned from Git History
+
+```yaml
+edges:
+  - source: src/lib/auth.ts
+    affects: [Login.tsx, Signup.tsx, middleware/auth.ts]
+    confidence: 4        # learned from 4 real co-changes
+```
+
+When files change together repeatedly, the graph learns and warns.
+
+### 4. Gap Detection
+
+```
+⚠ Incomplete change?  src/lib/auth.ts
+  Usually also changed: middleware/auth.ts · login.tsx
+  (4× co-changed in history — 2 missing from this commit)
+```
+
+### 5. MCP Server for Claude Code / Cursor
+
+```
+memory_search("auth bug")     → finds relevant gotchas cross-project
+session_context()             → compact context instead of 4+ files  
+capture_from_diff()           → learns from every commit automatically
+```
 
 ---
 
-## Upgrading from v5.x
+## Installation
+
+**Step 1 — Clone and run setup in your project:**
 
 ```bash
-# 1. Get the new release
-cd ai-context-v5.2
-bash install.sh          # overwrites ~/.ai-context/_ai_context_template/
-
-# 2. Update an existing project
-cd my-project
-ai-context-setup my-project   # regenerates _ai_context/ with new templates
-
-# 3. Optional: build registry (Pro)
-ai-registry --add-anchors && ai-registry --scan
-ai-rag --embed-chunks
+git clone https://github.com/studiodkmn-ctrl/ai-context-engine
+cd your-project
+bash /path/to/ai-context-engine/setup_ai_context.sh
 ```
 
-Existing `_gotchas.md`, `decisions.md`, etc. are preserved — only templates are updated.
+This creates `_ai_context/` in your project with:
+- Symbol map, interface snapshot, impact graph
+- Invariant definitions bootstrapped from your security patterns
+- Session context generator
+- Post-commit hook for automatic learning
 
----
+**Step 2 — Add MCP server (Claude Code / Cursor):**
 
-## Uninstall
+```jsonc
+// .mcp.json in your project
+{
+  "mcpServers": {
+    "ai-context": {
+      "command": "node",
+      "args": ["PATH_TO/ai-context-engine/mcp/dist/server.js"]
+    }
+  }
+}
+```
+
+**Step 3 — Generate your first session context:**
 
 ```bash
-# Remove shell aliases
-# From ~/.zshrc / ~/.bashrc: delete everything between "# AI Context v6.3" blocks
-
-# Remove global store
-rm -rf ~/.ai-context
-
-# Optional: uninstall Ollama (Pro)
-brew uninstall --cask ollama    # macOS
+bash _ai_context/scripts/ai-session-prep.sh
 ```
 
 ---
 
-## Context Format
+## Commands
 
-Gotchas, rules, and patterns use structured code format:
+```bash
+# Check invariants against staged changes
+bash _ai_context/scripts/ai-invariant-check.sh --staged
 
+# Route a bug description to likely source files  
+bash _ai_context/scripts/ai-symptom-router.sh "login button not responding"
+
+# Regenerate symbol map with signatures and callers
+bash _ai_context/scripts/ai-symbol-map.sh
+
+# Detect context drift (stale files, script updates)
+bash _ai_context/scripts/ai-context-doctor.sh
 ```
-ID: UNIQUE_ID
-→ Description
-✗ WRONG:   <bad example>
-✓ CORRECT: <good example>
-? Symptom:  <how to recognize it>
-@ Files:    <affected files>
-P: 1        (1=critical, 2=important, 3=nice-to-know)
-```
-
-`⇒` is a pointer — references other files, never copied inline. Claude loads referenced files on demand only.
 
 ---
 
-## License
+## MCP Tools (in Claude Code)
 
-MIT — free for personal and commercial use.
+```
+capture_from_diff(apply=true)    # auto-learn from current commit
+memory_search("jwt expiry")      # search across all your projects  
+session_context()                # load compact project context
+```
+
+---
+
+## Invariant Levels
+
+| Level | Meaning | In Commit Hook |
+|---|---|---|
+| `hard` | System breaks if violated | Blocks + error |
+| `soft` | Degraded behavior, warning | Warning shown |
+| `hint` | Code smell, best practice | Info shown |
+
+---
+
+## What it looks like inside Claude Code
+
+When AI Context Engine is active, Claude knows:
+
+- Which invariants your change might violate
+- Which files are typically changed together  
+- What functions call what — without reading entire files
+- What past bugs looked like in this area of code
+
+Instead of:
+```
+"Let me read auth.ts... and middleware.ts... and login.tsx..."
+```
+
+Claude says:
+```
+"The auth_first invariant is affected. 
+ Enforcement points: middleware/auth.ts:67 and api/users.ts:23.
+ Past fix: commit a4f2b1 added session check here."
+```
+
+---
+
+## Roadmap
+
+- [x] Impact Graph — learned co-change relationships
+- [x] Symbol Map — functions, signatures, callers (`used_in`)
+- [x] Invariant Layer — hard/soft/hint rules with file deps
+- [x] Gap Detection — missing co-changes flagged at commit
+- [x] Intent Tagging — commit meaning extracted + stored
+- [x] MCP Server — Claude Code / Cursor integration
+- [x] Cross-project memory — learnings transfer between projects
+- [ ] Invariant discovery — auto-suggest invariants from bug history
+- [ ] Static verification — verify invariants are enforced in code
+- [ ] System Behavior Model — goal-state layer above invariants
+
+---
+
+## Philosophy
+
+> *Your codebase is not files. It's a system of constraints.*  
+> *Code is implementation. Rules are truth.*
+
+AI Context Engine is the layer that makes rules explicit —  
+so AI agents can reason about your system, not just read it.
+
+---
+
+## Contributing
+
+This is an open system. Add your own invariants, extend the impact graph, build integrations.
+
+```bash
+# Add a new invariant
+vi _ai_context/invariants.yaml
+
+# Teach the impact graph a new relationship
+bash _ai_context/scripts/ai-impact-learn.sh src/auth.ts src/middleware.ts
+```
+
+---
+
+**Star this repo if you believe coding agents should understand systems, not just files.**

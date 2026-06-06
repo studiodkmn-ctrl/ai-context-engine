@@ -6,6 +6,32 @@
 
 ---
 
+## Does Claude burn through your plan too fast?
+
+If you're using Claude Pro or Claude Max for coding work, you've probably noticed:  
+complex projects eat through your quota quickly — because Claude reads entire files to answer a single question.
+
+**AI Context Engine reduces context token usage by ~80% per session.**
+
+Here's why that matters:
+
+| Session (10 tasks, ~10k LOC project) | Without | With AI Context |
+|---|---|---|
+| Session startup context | ~9,000 tokens | ~2,000 tokens |
+| Per bug fix (avg. 3 files read) | ~5,400 tokens | ~900 tokens |
+| Full session total | **~63,000 tokens** | **~11,000 tokens** |
+
+Instead of reading `auth.ts` (2,500 tokens) to find one function,  
+the engine serves the exact function signature + line number in ~80 tokens.
+
+**The practical effect:**  
+Claude Pro users often upgrade to Max because large codebases burn through rate limits.  
+With AI Context Engine, a Claude Pro plan handles the same workload —  
+because each interaction loads 5× less context.  
+**Your Pro plan becomes as effective as Max for most coding sessions.**
+
+---
+
 Your codebase is not a collection of files.  
 It is a system of constraints, rules, and dependencies.  
 **AI Context Engine makes that system visible — before you commit.**

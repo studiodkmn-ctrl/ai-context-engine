@@ -68,3 +68,4 @@ pattern:
 <!-- /error_format -->
 
 > REGELN: P1-Regeln niemals löschen. Überlauf >10 → P3 zuerst, dann prüfe ob älteste P2-Regel Framework-Default ist.
+> seen: [YYYY-MM-DD] optional pro Regel (nach P: einfügen) — Frische-Status (fresh/check/orphan) landet in registry.yaml, siehe _gotchas.md#legende.

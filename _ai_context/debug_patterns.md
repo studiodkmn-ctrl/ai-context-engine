@@ -37,6 +37,7 @@ fix:
 ```
 ID: _template
 P: 2
+seen: [YYYY-MM-DD]
 → [Kurzbeschreibung]
 ? [Fehlermeldung / Symptom]
 fix: [Lösung als Code]
@@ -45,3 +46,4 @@ fix: [Lösung als Code]
 ```
 
 > REGELN: Vor Writeback IDs prüfen (--dedup). Überlauf: P3 → Archiv, P1 niemals löschen. Verweis (⇒) statt Inhalt kopieren.
+> seen: optional, siehe _gotchas.md#legende — Frische-Status landet in registry.yaml.

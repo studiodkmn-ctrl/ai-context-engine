@@ -233,6 +233,30 @@ if oversized:
 else:
     emit('oversize', 'PASS', 'NONE', 'alle Dateien im Token-Rahmen')
 
+# ====================== Check 7b: Freshness (v7) ============================
+# Liest registry.yaml (seen/code_touched/status, siehe ai-context-registry.sh
+# --scan) und meldet orphans (naechster --scan raeumt automatisch mechanisch
+# nicht auf, das ist fuer Claude) + wie viele Chunks 'check' brauchen.
+registry_path = ctx / 'registry.yaml'
+if registry_path.exists():
+    reg_chunks = ctxlib.parse_registry(str(registry_path))['chunks']
+    fresh_n = sum(1 for c in reg_chunks if c.get('status') == 'fresh')
+    check_n = sum(1 for c in reg_chunks if c.get('status') == 'check')
+    orphan_n = sum(1 for c in reg_chunks if c.get('status') == 'orphan')
+    orphan_ids = [c['id'] for c in reg_chunks if c.get('status') == 'orphan']
+    if orphan_n > 0:
+        emit('freshness', 'WARN', 'CLAUDE',
+             f'{orphan_n} verwaiste(r) Chunk(s) (Code-Datei fehlt) — {fresh_n} fresh, {check_n} check',
+             orphan_ids)
+    elif check_n > 0:
+        emit('freshness', 'WARN', 'CLAUDE',
+             f'{check_n} Chunk(s) moeglw. veraltet (Code neuer als seen) — {fresh_n} fresh',
+             [c['id'] for c in reg_chunks if c.get('status') == 'check'])
+    else:
+        emit('freshness', 'PASS', 'NONE', f'alle {fresh_n} Chunks fresh')
+else:
+    emit('freshness', 'PASS', 'NONE', 'registry.yaml nicht vorhanden — --scan ausfuehren')
+
 # ============= Check 8b: Session-Datum veraltet ============================
 # Liest "Session: YYYY-MM-DD" aus _ai_index.md und warnt wenn > 14 Tage alt.
 import datetime

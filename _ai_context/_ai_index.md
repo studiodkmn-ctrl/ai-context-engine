@@ -1,11 +1,20 @@
 # 🧠 Index
 
+## ⚡ Aktueller Fokus
+```
+Fokus:          [Was gerade aktiv entwickelt wird]
+Seit:           [DATE]
+Letzter Commit: [Kurzbeschreibung]
+Nächstes:       [Was als nächstes ansteht]
+```
+> REGEL: Diesen Block bei jedem Commit aktuell halten — verhindert 10-Minuten-Orientierungsphase.
+
 ## Projekt
 ```
 Stack:    Test
 Phase:    Beta
-Git:      6a1227420a1ef79acfb7bffa0f81f30bb3bf0139
-Session:  2026-06-04
+Git:      48375b96f3dd19dce64465df9b5594558187ddba
+Session:  2026-07-07
 ```
 
 ## 📚 Datei-Tabelle

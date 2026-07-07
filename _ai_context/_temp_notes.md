@@ -51,3 +51,5 @@ Done this sprint:
 > RULE: Trim "Recent Changes" to last 5 after every update.
 > RULE: Clear "Session Notes" at sprint start.
 > Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md
+
+- Intent: feat(v7-phase1): shared ctx.py lib + tag-quality/synonym fixes  (2026-07-07) <!-- hash:76f8ff9a4f01 -->

@@ -1,6 +1,15 @@
 # 🧠 AI Context Index — [PROJECT_NAME]
 > **~200 Tokens. Immer laden. Erst Datei-Tabelle scannen → dann gezielt laden.**
 
+## ⚡ Aktueller Fokus
+```
+Fokus:        [Was gerade aktiv entwickelt wird — z.B. "Auth-Flow Refactor"]
+Seit:         [DATE]
+Letzter Commit: [Kurzbeschreibung des letzten Commits]
+Nächster Schritt: [Was als nächstes ansteht]
+```
+> REGEL: Diesen Block bei jedem Commit aktuell halten — verhindert 10-Minuten-Orientierungsphase.
+
 ## Projekt
 ```
 Stack:    [PROJECT_STACK]
@@ -30,6 +39,9 @@ Session:  2026-04-29
 | `current_sprint.md` | Aktive Tasks, Sprint-Stand | 🟢 | [DATE] |
 | `_temp_notes.md` | Recent Changes, lose Notizen | 🟢 | [DATE] |
 | `HANDOFF.md` | Session-Übergabe (wenn unfertig) | ⚪ | — |
+| `hot_paths.md` | Kritische Runtime-Invarianten (max 6) | 🟢 | [DATE] |
+| `_idx/symbols.md` | Symbol-Map mit Zeilennummern (auto-gen) | 🟢 | [DATE] |
+| `_idx/interfaces.md` | Interface/Type-Snapshot (auto-gen) | 🟢 | [DATE] |
 
 ## 🗂️ Domain-Router (zweistufig — für Routing)
 | Domain | Index | Lade wenn... |

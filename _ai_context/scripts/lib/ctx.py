@@ -192,13 +192,26 @@ def git_last_touched(paths: list[str], cwd: str | None = None) -> str | None:
     return max(dates) if dates else None
 
 
+def _looks_like_path(token: str) -> bool:
+    """True for plausible file paths, False for prose like "alle API routes".
+
+    The `@` line mixes real paths ("src/lib/auth.ts") with free-text hints
+    ("alle API routes", "alle DB-Zugriffe") — only the former are useful
+    for git_last_touched()/orphan-detection.
+    """
+    token = token.strip()
+    if not token:
+        return False
+    return "/" in token or bool(re.search(r"\.\w{1,4}$", token))
+
+
 def parse_at_files(chunk_text: str) -> list[str]:
-    """Extract file paths from the `@ file1, file2` line of a chunk."""
+    """Extract plausible file paths from the `@ file1, file2, ...` line."""
     m = AT_FILES_RE.search(chunk_text)
     if not m:
         return []
     raw = m.group(1)
-    return [f.strip() for f in raw.split(",") if f.strip() and f.strip() != "alle DB-Zugriffe"]
+    return [f.strip() for f in raw.split(",") if _looks_like_path(f)]
 
 
 def extract_seen_field(chunk_text: str) -> str | None:
@@ -243,11 +256,14 @@ def extract_tags_from_chunk(chunk_id: str, text: str, synonyms: dict[str, list[s
     filters stopwords + MIN_TAG_LEN, optionally expands via synonyms,
     returns top-8 alphabetically sorted (unchanged v6.x sort behaviour).
     """
+    # Umlaute (äöüß) im Wort-Zeichensatz — sonst zerschneidet die Regex z.B.
+    # "schlägt" in "schl" + "gt" (der genaue S5-Bug: abgeschnittene Woerter).
+    WORD_RE = re.compile(r"[a-zA-Zäöüß][a-zA-Z0-9äöüß_-]{2,}")
     words: set[str] = set()
     for label_pattern in (r"→\s*([^\n]+)", r"@\s*([^\n]+)", r"scope:\s*([^\n]+)"):
         lm = re.search(label_pattern, text)
         if lm:
-            words.update(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", lm.group(1).lower()))
+            words.update(WORD_RE.findall(lm.group(1).lower()))
     words.update(p for p in re.split(r"[_\-]", chunk_id.lower()) if len(p) > 2)
 
     filtered = {

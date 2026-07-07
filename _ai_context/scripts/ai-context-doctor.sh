@@ -15,6 +15,7 @@
 #   - Index ↔ Datei         (für Claude)
 #   - Übergroße Dateien     (für Claude)
 #   - Regel-Konflikte       (für Claude — via check_context_hash.sh)
+#   - Script-Drift (W7)     (für Claude — Projekt-Kopie ↔ globales Template)
 #
 # Usage:
 #   bash ai-context-doctor.sh            # --check: Health-Report (exit 0/1)
@@ -52,7 +53,7 @@ REPORT="$(mktemp -t aictx-doctor.XXXXXX.txt)"
 trap 'rm -f "$CHECKER" "$REPORT"' EXIT
 
 cat > "$CHECKER" << 'PYEOF'
-import sys, re, pathlib
+import sys, re, pathlib, subprocess
 
 ctx = pathlib.Path(sys.argv[1])
 proj = pathlib.Path(sys.argv[2])
@@ -232,12 +233,131 @@ if oversized:
 else:
     emit('oversize', 'PASS', 'NONE', 'alle Dateien im Token-Rahmen')
 
+# ============= Check 8b: Session-Datum veraltet ============================
+# Liest "Session: YYYY-MM-DD" aus _ai_index.md und warnt wenn > 14 Tage alt.
+import datetime
+idx_path = ctx / '_ai_index.md'
+if idx_path.exists():
+    m = re.search(r'Session:\s*(\d{4}-\d{2}-\d{2})', idx_path.read_text(encoding='utf-8', errors='ignore'))
+    if m:
+        try:
+            session_date = datetime.date.fromisoformat(m.group(1))
+            age = (datetime.date.today() - session_date).days
+            if age > 14:
+                emit('stalesession', 'WARN', 'MECH',
+                     f'Session-Kontext {age} Tage alt (letzte Session: {m.group(1)}) — ai-session-prep.sh ausführen')
+            else:
+                emit('stalesession', 'PASS', 'NONE', f'Session-Kontext aktuell ({age} Tage)')
+        except ValueError:
+            pass
+
+# ============= Check 9: Symbol-Drift (semantische Verjaehrung) =============
+# Fuer jeden Gotcha/Pattern mit @-Datei-Referenz: pruefen ob im Body genannte
+# Identifier (camelCase/snake_case-Tokens) noch via `git grep -w` im Projekt
+# zu finden sind. Hit-Rate < 50% (mind. 2 Symbole erforderlich) → WARN.
+SYM_STOP = {
+    'true','false','null','none','this','self','that','then','else','async',
+    'await','return','const','class','function','import','export','default',
+    'public','private','protected','static','void','undefined','typeof',
+    'string','number','boolean','object','array','promise','response','request',
+    'props','state','error','params','config','options','client','server',
+    'gotcha','pattern','rule','file','line','code','test','spec',
+    'beschreibung','symptom','dateien','prio','status',
+}
+def _extract_identifiers(text):
+    out = set()
+    # camelCase / PascalCase: must contain at least one inner uppercase
+    for m in re.finditer(r'\b[A-Za-z][A-Za-z0-9]{3,}\b', text):
+        tok = m.group(0)
+        if tok.lower() in SYM_STOP:
+            continue
+        has_inner_upper = any(c.isupper() for c in tok[1:])
+        if not has_inner_upper:
+            continue
+        out.add(tok)
+    # snake_case: must contain at least one underscore between letters
+    for m in re.finditer(r'\b[a-z][a-z0-9_]*_[a-z0-9_]+\b', text):
+        tok = m.group(0)
+        if tok.lower() in SYM_STOP:
+            continue
+        out.add(tok)
+    return out
+
+_grep_available = None
+def _has_symbol(sym):
+    global _grep_available
+    if _grep_available is False:
+        return None
+    try:
+        if _grep_available is None:
+            t = subprocess.run(['git', 'rev-parse', '--is-inside-work-tree'],
+                               cwd=str(proj), capture_output=True, timeout=3)
+            _grep_available = t.returncode == 0
+            if not _grep_available:
+                return None
+        r = subprocess.run(['git', 'grep', '-q', '-w', '--', sym],
+                           cwd=str(proj), capture_output=True, timeout=5)
+        return r.returncode == 0
+    except Exception:
+        return None
+
+drift_entries = []
+checked_total = 0
+for rf in ('_gotchas.md', 'debug_patterns.md', 'security.md'):
+    fp = ctx / rf
+    if not fp.exists():
+        continue
+    text = fp.read_text(encoding='utf-8', errors='ignore')
+    for m in re.finditer(r'```\s*\n((?:ID:|RULE:)[\s\S]*?)```', text):
+        body = m.group(1)
+        idm = re.search(r'(?:ID:|RULE:)\s*(\S+)', body)
+        if not idm:
+            continue
+        cid = idm.group(1)
+        # nur Eintraege mit @-Datei-Referenz checken
+        if not re.search(r'\n@\s*\S+', body):
+            continue
+        idents = list(_extract_identifiers(body))[:6]
+        if len(idents) < 2:
+            continue
+        found_ct = 0
+        usable = 0
+        for s in idents:
+            res = _has_symbol(s)
+            if res is None:
+                continue  # git nicht verfuegbar — Symbol ueberspringen
+            usable += 1
+            if res:
+                found_ct += 1
+        if usable < 2:
+            continue
+        checked_total += 1
+        if found_ct / usable < 0.5:
+            drift_entries.append(
+                f'{cid} ({rf}) — {found_ct}/{usable} Symbol(e) im Code')
+
+if drift_entries:
+    emit('symboldrift', 'WARN', 'CLAUDE',
+         f'{len(drift_entries)} Eintrag/Eintraege mit verjaehrten Symbolen',
+         drift_entries)
+elif checked_total > 0:
+    emit('symboldrift', 'PASS', 'NONE',
+         f'alle @-referenzierten Symbole aktiv ({checked_total} geprueft)')
+# wenn checked_total == 0 (kein git oder keine Eintraege mit @): kein Check-Ergebnis
+
 # ---- Ausgabe (maschinenlesbar) ----
 for cid, status, fixkind, msg, details in results:
     print(f'CHECK|{cid}|{status}|{fixkind}|{msg}')
     for d in details:
         print(f'DETAIL|{cid}|{d}')
 PYEOF
+
+# macOS/Linux-portabler Datei-Hash (md5sum | md5).
+portable_hash() {
+  md5sum "$1" 2>/dev/null | cut -d' ' -f1 \
+    || md5 -q "$1" 2>/dev/null \
+    || echo "n/a"
+}
 
 # ---- Checks ausführen → REPORT ----
 run_checks() {
@@ -257,6 +377,33 @@ run_checks() {
       echo "$cout" | grep -E '↔|→' | sed 's/^/DETAIL|conflicts|/' >> "$REPORT"
     fi
   fi
+
+  # Check 9 (W7): Script-Drift — Projekt-Kopie ↔ globales Template.
+  # Warnt, wenn die zwei Script-Kopien auseinanderlaufen (Template aktualisiert,
+  # Projekt nicht — oder umgekehrt). Übersprungen, wenn kein globales Template da.
+  local tmpl_scripts="$HOME/.ai-context/_ai_context_template/scripts"
+  if [ -d "$tmpl_scripts" ] && [ -d "$SCRIPT_DIR" ]; then
+    local drifted=()
+    local f base tmpl
+    for f in "$SCRIPT_DIR"/*.sh; do
+      [ -f "$f" ] || continue
+      base="$(basename "$f")"
+      tmpl="$tmpl_scripts/$base"
+      [ -f "$tmpl" ] || continue   # nur gemeinsame Scripts vergleichen
+      if [ "$(portable_hash "$f")" != "$(portable_hash "$tmpl")" ]; then
+        drifted+=("$base")
+      fi
+    done
+    if [ ${#drifted[@]} -gt 0 ]; then
+      echo "CHECK|scriptdrift|WARN|CLAUDE|${#drifted[@]} Script(s) weichen vom globalen Template ab" >> "$REPORT"
+      local d
+      for d in "${drifted[@]}"; do
+        echo "DETAIL|scriptdrift|$d — sync via: cp ~/.ai-context/_ai_context_template/scripts/$d $SCRIPT_DIR/$d" >> "$REPORT"
+      done
+    else
+      echo "CHECK|scriptdrift|PASS|NONE|Scripts ↔ Template synchron" >> "$REPORT"
+    fi
+  fi
 }
 
 # ---- mechanische Fixes ----
@@ -271,6 +418,11 @@ apply_mechanical_fixes() {
   fi
   if grep -q '^CHECK|mapdrift|WARN' "$REPORT" && [ -f "$map" ]; then
     bash "$map" > /dev/null 2>&1
+    fixed=$((fixed + 1))
+  fi
+  local prep="$SCRIPT_DIR/ai-session-prep.sh"
+  if grep -q '^CHECK|stalesession|WARN' "$REPORT" && [ -f "$prep" ]; then
+    bash "$prep" > /dev/null 2>&1
     fixed=$((fixed + 1))
   fi
   echo "$fixed"

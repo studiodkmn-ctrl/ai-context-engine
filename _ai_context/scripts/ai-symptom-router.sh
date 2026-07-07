@@ -26,6 +26,21 @@ if [ -z "$QUERY" ]; then
   exit 1
 fi
 
+# temporal pre-filter — defensiv, router darf nicht brechen
+TEMPORAL_SUSPECT=""
+TEMPORAL_DATE=""
+_WHENBROKE="$(dirname "${BASH_SOURCE[0]}")/ai-when-broke.sh"
+if [ -x "$_WHENBROKE" ]; then
+  _TBOUT=$(bash "$_WHENBROKE" 2>/dev/null) || true
+  if [ -n "$_TBOUT" ]; then
+    _TS=$(printf '%s' "$_TBOUT" | grep "^SUSPECT:" | head -1 | sed 's/SUSPECT: //;s/[(].*//' | xargs)
+    _TD=$(printf '%s' "$_TBOUT" | grep "^BROKE_WINDOW:" | head -1 | awk '{print $NF}')
+    # Nur echte Dateipfade übernehmen (mit Punkt, kein Leerstring)
+    case "$_TS" in *.*) TEMPORAL_SUSPECT="$_TS" ;; *) TEMPORAL_SUSPECT="" ;; esac
+    TEMPORAL_DATE="${_TD:-}"
+  fi
+fi
+
 ROUTER_PY="$(mktemp -t aictx-router.XXXXXX.py)"
 trap 'rm -f "$ROUTER_PY"' EXIT
 
@@ -35,6 +50,8 @@ import sys, re, pathlib
 context_dir = pathlib.Path(sys.argv[1])
 query = sys.argv[2]
 graph_path = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 else None
+temporal_suspect = sys.argv[4] if len(sys.argv) > 4 else ''
+temporal_date    = sys.argv[5] if len(sys.argv) > 5 else ''
 
 STOP = {'the', 'a', 'an', 'is', 'are', 'not', 'does', 'doesnt', 'do', 'my',
         'on', 'in', 'at', 'to', 'it', 'this', 'that', 'when', 'and', 'or',
@@ -140,6 +157,10 @@ gotcha_hits = [(s, c) for s, c in gotcha_hits if s > 0][:3]
 print(f'\U0001f50e Symptom-Router — "{query}"')
 print()
 
+if temporal_suspect:
+    print(f'TEMPORAL: Verdacht auf {temporal_suspect} (kaputt seit {temporal_date})')
+    print()
+
 print('INTERACTION MAP:')
 if map_state == 'missing':
     print('  (keine Map — erst `bash _ai_context/scripts/ai-context-map.sh` laufen lassen)')
@@ -181,33 +202,26 @@ else:
 print()
 
 # ------------------------------------------------- Lese-Empfehlung
-# to_read: list[(file, line|None)] — Zeile durchreichen für Editor-Sprung
 to_read = []
-seen = set()
 for s, r in map_hits:
-    file_part, _, line_part = r['loc'].partition(':')
-    line_no = int(line_part) if line_part.isdigit() else None
-    if file_part and file_part not in seen:
-        to_read.append((file_part, line_no))
-        seen.add(file_part)
+    f = r['loc'].split(':')[0]
+    if f and f not in to_read:
+        to_read.append(f)
 for s, c in debug_hits:
-    for tok in re.split(r'[,\s]+', c['files']):
-        tok = tok.strip()
-        if not tok or '.' not in tok:
-            continue
-        file_part, _, line_part = tok.partition(':')
-        line_no = int(line_part) if line_part.isdigit() else None
-        if file_part and file_part not in seen:
-            to_read.append((file_part, line_no))
-            seen.add(file_part)
+    for f in re.split(r'[,\s]+', c['files']):
+        f = f.strip()
+        if f and '.' in f and f not in to_read:
+            to_read.append(f)
+
+if temporal_suspect:
+    if temporal_suspect in to_read:
+        to_read.remove(temporal_suspect)
+    to_read.insert(0, temporal_suspect)
 
 print('EMPFOHLEN ZU LESEN (in dieser Reihenfolge):')
 if to_read:
-    for file_part, line_no in to_read[:5]:
-        if line_no is not None:
-            print(f'  - {file_part}:{line_no}')
-        else:
-            print(f'  - {file_part}')
+    for f in to_read[:5]:
+        print(f'  - {f}')
 else:
     print('  - (kein eindeutiger Verdächtiger — _interaction_map.md manuell prüfen)')
 
@@ -223,7 +237,7 @@ if graph_path and graph_path.exists() and to_read:
             raw = gs.split(':', 1)[1].strip().strip('[]')
             g_edges[g_cur] = [x.strip() for x in raw.split(',') if x.strip()]
             g_cur = None
-    cochange = [(f, g_edges[f]) for f, _ in to_read if g_edges.get(f)]
+    cochange = [(f, g_edges[f]) for f in to_read if g_edges.get(f)]
     if cochange:
         print()
         print('HÄUFIG MIT-BETROFFEN (gelernt aus früheren Fixes):')
@@ -232,7 +246,8 @@ if graph_path and graph_path.exists() and to_read:
 
 # Maschinenlesbarer Marker für das Skill
 print()
-print('__ROUTER__:' + ('|'.join(f for f, _ in to_read[:5]) if to_read else 'none'))
+print('__ROUTER__:' + ('|'.join(to_read[:5]) if to_read else 'none'))
 PYEOF
 
-python3 "$ROUTER_PY" "$CONTEXT_DIR" "$QUERY" "$IMPACT_GRAPH"
+python3 "$ROUTER_PY" "$CONTEXT_DIR" "$QUERY" "$IMPACT_GRAPH" \
+    "$TEMPORAL_SUSPECT" "$TEMPORAL_DATE"

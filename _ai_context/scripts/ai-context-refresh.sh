@@ -33,7 +33,9 @@ if [ "$MODE" = "--reset" ]; then
 fi
 
 # ---- Get stored hash ----
-STORED_HASH=$(grep "Last known git hash:" "$INDEX_FILE" 2>/dev/null | sed 's/.*: *//' | tr -d ' ')
+# Pipefail-safe: grep may find no match in newer index format ("Git:" instead).
+STORED_HASH=$( { grep -E "Last known git hash:|Git:" "$INDEX_FILE" 2>/dev/null || true; } \
+  | head -1 | sed 's/.*: *//' | tr -d ' ')
 CURRENT_HASH=$(cd "$PROJECT_DIR" && git log -1 --format="%H" 2>/dev/null || echo "no-git")
 
 if [ "$STORED_HASH" = "$CURRENT_HASH" ]; then
@@ -49,13 +51,17 @@ else
   echo -e "   Aktuell:     ${CURRENT_HASH:0:12}"
   echo ""
 
-  # Get changed files
-  CHANGED=""
+  # Get changed files — -M50% detects renames (>= 50% similarity).
+  # --name-status emits "A\tfile" | "M\tfile" | "D\tfile" | "R<NN>\told\tnew".
+  # We collect both sides of a rename so that domain patterns match either path
+  # AND the old path is invalidated even if the new name does not match any pattern.
+  RAW_DIFF=""
   if [ -n "$STORED_HASH" ] && [ "$STORED_HASH" != "[STORE" ]; then
-    CHANGED=$(cd "$PROJECT_DIR" && git diff --name-only "$STORED_HASH" "$CURRENT_HASH" 2>/dev/null || echo "")
+    RAW_DIFF=$(cd "$PROJECT_DIR" && git diff -M50% --name-status "$STORED_HASH" "$CURRENT_HASH" 2>/dev/null || echo "")
   else
-    CHANGED=$(cd "$PROJECT_DIR" && git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+    RAW_DIFF=$(cd "$PROJECT_DIR" && git diff -M50% --name-status HEAD~1 HEAD 2>/dev/null || echo "")
   fi
+  CHANGED=$(awk -F'\t' '$1 ~ /^R/ { print $2; print $3; next } { for(i=2;i<=NF;i++) print $i }' <<< "$RAW_DIFF")
 
   if [ -n "$CHANGED" ]; then
     echo -e "${CYAN}Geänderte Dateien:${NC}"

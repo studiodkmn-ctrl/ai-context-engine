@@ -98,7 +98,10 @@ try:
         elif d == '@supabase/supabase-js': stack.append('Supabase')
         elif d == 'tailwindcss': stack.append('Tailwind')
         elif d == 'typescript': stack.append('TypeScript')
-    
+
+    # Dedupe — z. B. \"prisma\" + \"@prisma/client\" mappen beide auf 'Prisma'
+    stack = list(dict.fromkeys(stack))
+
     # Get versions for key deps
     key = []
     for s in stack:

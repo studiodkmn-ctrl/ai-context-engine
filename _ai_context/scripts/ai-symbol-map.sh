@@ -75,34 +75,6 @@ EXT_MAP = {
     '.py': PY_PATS, '.go': GO_PATS, '.rs': RS_PATS,
 }
 
-def get_signature(raw_line):
-    """Extrahiert Funktionssignatur ab dem ersten '(' bis zur schließenden ')' (max 70 Zeichen)."""
-    start = raw_line.find('(')
-    if start == -1:
-        return ''
-    depth = 0
-    chars = []
-    for ch in raw_line[start:]:
-        if ch == '(':
-            depth += 1
-        elif ch == ')':
-            depth -= 1
-            chars.append(ch)
-            if depth == 0:
-                break
-        chars.append(ch) if ch != ')' else None
-    # Füge schließende Klammer korrekt ein
-    sig = raw_line[start:start + raw_line[start:].find(')') + 1] if ')' in raw_line[start:] else ''
-    # Return-Typ für TypeScript `: Type` direkt nach ')'
-    after = raw_line[start + len(sig):].strip() if sig else ''
-    ret = ''
-    if after.startswith(':'):
-        ret_match = re.match(r':\s*([^{;]+)', after)
-        if ret_match:
-            ret = ': ' + ret_match.group(1).strip()
-    full = (sig + ret)[:70]
-    return full
-
 def get_comment(lines, idx):
     """Extract one-line description from JSDoc or // comment above the symbol."""
     if idx == 0:
@@ -149,8 +121,7 @@ def extract_symbols(path):
             if exported_only and name.startswith('_'):
                 continue
             desc = get_comment(lines, i)
-            sig = get_signature(line)
-            results.append((i + 1, name, sig, desc))
+            results.append((i + 1, name, desc))
             if len(results) >= MAX_SYMBOLS_PER_FILE:
                 break
         if len(results) >= MAX_SYMBOLS_PER_FILE:
@@ -171,64 +142,20 @@ def walk_files():
 files = walk_files()
 results = {}
 total_syms = 0
-file_contents = {}
 
 for rel, p in files:
-    try:
-        content = p.read_text(encoding='utf-8', errors='replace')
-    except Exception:
-        content = ''
-    file_contents[str(rel)] = content
     syms = extract_symbols(p)
     if syms:
         results[str(rel)] = syms
         total_syms += len(syms)
 
-# ── Usage Scan: welche Dateien rufen welche Symbole auf? ─────────────────────
-MAX_CALLERS = 5
-MIN_NAME_LEN = 4  # Kurze Namen (len, get, run) erzeugen zu viele False Positives
-
-# Definitionsdatei pro Symbol
-defining = {}
-for rel_path, syms in results.items():
-    for lineno, name, sig, desc in syms:
-        defining[name] = rel_path
-
-# Für jedes Symbol: Dateien finden die es aufrufen (nicht definieren)
-usage_map = {}
-for name, def_file in defining.items():
-    if len(name) < MIN_NAME_LEN:
-        continue
-    pat = re.compile(r'\b' + re.escape(name) + r'\s*[\(.]')
-    callers = []
-    for rel_path, content in file_contents.items():
-        if rel_path == def_file:
-            continue
-        if len(callers) >= MAX_CALLERS:
-            break
-        if pat.search(content):
-            callers.append(rel_path)
-    if callers:
-        usage_map[name] = callers
-
 # Output format
 print(f"FILES:{len(results)} SYMBOLS:{total_syms}")
 for rel_path, syms in sorted(results.items()):
     print(f"FILE:{rel_path}")
-    for lineno, name, sig, desc in syms:
-        # Signatur in desc-Spalte, Name bleibt sauber (kein :-Konflikt im Parser)
-        if sig and desc:
-            desc_part = f"  {sig}  — {desc}"
-        elif sig:
-            desc_part = f"  {sig}"
-        elif desc:
-            desc_part = f"  — {desc}"
-        else:
-            desc_part = ""
+    for lineno, name, desc in syms:
+        desc_part = f"  — {desc}" if desc else ""
         print(f"  SYM:{lineno}:{name}:{desc_part}")
-        callers = usage_map.get(name, [])
-        if callers:
-            print(f"  USED:{name}:{','.join(callers)}")
 PYEOF
 
 output=$(python3 "$EXTRACTOR" "$PROJECT_DIR" 2>/dev/null)
@@ -260,14 +187,8 @@ build_md() {
       rest2="${rest#*:}"
       name="${rest2%%:*}"
       desc="${rest2#*:}"
-      # Align columns (name sauber, sig+comment in desc-Spalte)
+      # Align columns
       printf "  %-35s L%-6s%s\n" "$name" "$lineno" "$desc"
-    elif [[ "$line" == "  USED:"* ]]; then
-      rest="${line#  USED:}"
-      callers="${rest#*:}"
-      # Ersetze Kommas durch " · " für Lesbarkeit
-      callers_fmt="${callers//,/ · }"
-      printf "    → used in: %s\n" "$callers_fmt"
     fi
   done <<< "$output"
 }

@@ -61,3 +61,7 @@ Done this sprint:
 - Testfakt SMOKE-1783421807316: stdio MCP funktioniert  (2026-07-07) <!-- hash:19a066365c26 -->
 
 - Testfakt SMOKE-1783421960409: stdio MCP funktioniert  (2026-07-07) <!-- hash:5f889daee693 -->
+
+- Intent: feat(v7-phase4): locate() MCP tool — single lookup for all drawers  (2026-07-07) <!-- hash:d5441cb95373 -->
+
+- Testfakt SMOKE-1783422265977: stdio MCP funktioniert  (2026-07-07) <!-- hash:c75792a15827 -->

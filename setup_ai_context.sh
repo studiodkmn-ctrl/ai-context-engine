@@ -529,6 +529,15 @@ if [ -f "$CONTEXT_DIR/scripts/ai-interface-snapshot.sh" ]; then
   bash "$CONTEXT_DIR/scripts/ai-interface-snapshot.sh" 2>/dev/null || true
 fi
 
+# ---- Generate Interaction Map (v7) — einmalig beim Setup, danach übernimmt
+# der post-commit Hook (bei Komponenten-Änderungen). Nur bei erkanntem
+# Frontend; das Script selbst überspringt sich still, wenn 0 Elemente
+# gefunden werden (kein sinnloses Leer-File).
+if $HAS_FRONTEND && [ -f "$CONTEXT_DIR/scripts/ai-context-map.sh" ]; then
+  echo -e "${CYAN}▶ Generiere Interaction Map (_interaction_map.md)...${NC}"
+  bash "$CONTEXT_DIR/scripts/ai-context-map.sh" 2>/dev/null || true
+fi
+
 # ---- Generate _SESSION.md ----
 echo -e "${CYAN}▶ Generiere _SESSION.md...${NC}"
 bash "$CONTEXT_DIR/scripts/ai-session-prep.sh"

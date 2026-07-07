@@ -1,6 +1,6 @@
 # Symbol Map — ai-context-v6.5
-> Auto-generiert: 2026-07-07 13:47 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
-> 10 Dateien · 59 Symbole · Direkt springen: Datei:Zeilennummer
+> Auto-generiert: 2026-07-07 14:00 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> 12 Dateien · 84 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `context_manager_agent.py`
   ProjectMetadata                     L37    
@@ -31,6 +31,31 @@
   integrate_into_orchestrator         L826   
 ## `mcp/src/capture-cli.ts`
   main                                L11    
+## `mcp/src/lib/locate.ts`
+  tokens                              L25    
+  raw                                 L26    
+  loadSynonyms                        L31      — ------------------------------------------------------------
+  expandQueryTokens                   L50    
+  parseDrawers                        L69    
+  globToRegExp                        L97    
+  matchingDrawers                     L117   
+  fileInDrawer                        L121   
+  parseInteractionMap                 L134   
+  scoreMapRow                         L159   
+  parseRegistry                       L187   
+  extractChunkBody                    L224   
+  escapeRe                            L237   
+  symptomLine                         L241   
+  extractAtFiles                      L247     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
+  scoreChunk                          L253   
+  freshnessNote                       L261   
+  parseSymbols                        L276   
+  parseInterfaces                     L312   
+  parseInvariants                     L341   
+  parseImpactGraph                    L371     — ------------------------------------------------------------
+  locateQuery                         L401   
+  boost                               L436     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
+  addFile                             L546   
 ## `mcp/src/lib/paths.ts`
   findProjectRoot                     L9     
   localContextDir                     L23      — Pfad zum projektlokalen `_ai_context`-Ordner.
@@ -50,8 +75,10 @@
   tokenize                            L67    
   scoreBlock                          L75    
   searchContext                       L98    
+## `mcp/src/locate-cli.ts`
+  main                                L16    
 ## `mcp/src/server.ts`
-  main                                L14    
+  main                                L15    
 ## `mcp/src/tools/capture_from_diff.ts`
   readDiff                            L63    
   tryGit                              L64    

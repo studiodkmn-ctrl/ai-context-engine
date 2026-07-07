@@ -89,6 +89,15 @@ def extract_fn_body(content, name):
                 depth -= 1
                 if depth == 0:
                     return content[start:i + 1]
+    # v7: knappe Arrow-Function ohne Block-Body — const NAME = (...) => expr;
+    # (kein '{' nach '=>', daher kein Brace-Match moeglich — Text bis zum
+    # Statement-Ende reicht als Pseudo-Body fuer analyze()'s Endpoint-Suche.)
+    concise = re.compile(
+        r'\b(?:const|let|var)\s+' + n + r'\s*=\s*(?:async\s*)?\([^)]*\)\s*'
+        r'(?::\s*[\w<>\[\] ,|]+\s*)?=>\s*(?!\{)([^\n;]{1,300})')
+    m = concise.search(content)
+    if m:
+        return m.group(1)
     return ''
 
 AXIOS_RE   = re.compile(r'axios(?:\.(get|post|put|patch|delete))?\s*\(\s*' + QUOTE + r'([^`\'"]+)')

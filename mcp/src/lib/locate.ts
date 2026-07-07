@@ -461,7 +461,9 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
 
   if (mapHits.length) {
     const top = mapHits[0];
-    lines.push(`🔘 ${top.row.elem}  ${top.row.loc}`);
+    // row.elem enthält bereits ein Icon-Präfix (🔘 button / 📋 form / 🔗 link,
+    // siehe ai-context-map.sh ICON-Map) — hier keins mehr voranstellen.
+    lines.push(`${top.row.elem}  ${top.row.loc}`);
     lines.push(`   handler: ${top.row.handler}  |  state: ${top.row.store}  |  endpoint: ${top.row.endpoint}`);
     topFile = top.row.loc.split(':')[0];
     topScore = top.score + boost(topFile);

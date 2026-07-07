@@ -15,6 +15,8 @@ set -euo pipefail
 
 CONTEXT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INDEX_FILE="$CONTEXT_DIR/_ai_index.md"
+LIB_DIR="$CONTEXT_DIR/scripts/lib"
+DRAWERS_FILE="$CONTEXT_DIR/drawers.yaml"
 TODAY=$(date +"%Y-%m-%d")
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -205,9 +207,16 @@ print(sum(1 for b in blocks if re.search(r'\nP:\s*3', b)))
 fi
 
 # 2. Übervolle Domain-Dateien splitten (Trigger: > 80 Zeilen)
-for check_file in "frontend/components.md" "frontend/state.md" "backend/endpoints.md" "backend/database.md" "backend/auth.md"; do
-  split_domain_file "$check_file" 80
-done
+# v7: Liste kommt aus drawers.yaml statt hartkodiert — fällt auf die alte
+# v6.x-Liste zurück, falls noch kein Manifest existiert (Alt-Projekte vor v7).
+if [ -f "$DRAWERS_FILE" ] && [ -f "$LIB_DIR/ctx.py" ]; then
+  DRAWER_INDEXES=$(python3 "$LIB_DIR/ctx.py" list_drawer_indexes "$DRAWERS_FILE" 2>/dev/null || true)
+else
+  DRAWER_INDEXES=$'frontend/components.md\nfrontend/state.md\nbackend/endpoints.md\nbackend/database.md\nbackend/auth.md'
+fi
+while IFS= read -r check_file; do
+  [ -n "$check_file" ] && split_domain_file "$check_file" 80
+done <<< "$DRAWER_INDEXES"
 
 # 3. _ai_index.md mit Schubladen-Pointern aktualisieren
 if [ "$DRAWERS_CREATED" -gt 0 ]; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# setup_ai_context.sh — v6.3 (Two-Tier Index + Registry + RAG)
+# setup_ai_context.sh — v6.5 (MCP-Schicht + Symbol Map + Invariant Layer)
 #
 # NEU in v6.0:
 #   - Universale Stack-Erkennung (20+ Frameworks)
@@ -191,7 +191,7 @@ ENV_EXISTS=$([ -f "$TARGET_DIR/.env" ] && echo "yes" || echo "no")
 # ---- Header ----
 echo ""
 echo -e "${BOLD}${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${BLUE}║  🧠 AI Context Setup v6.3 — Two-Tier Index       ║${NC}"
+echo -e "${BOLD}${BLUE}║  🧠 AI Context Setup v6.5 — MCP + Symbol Map      ║${NC}"
 echo -e "${BOLD}${BLUE}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${CYAN}Projekt:${NC}   $PROJECT_NAME"
@@ -274,6 +274,11 @@ for f in "$TEMPLATE_DIR"/scripts/*.sh; do
   cp "$f" "$target"
   chmod +x "$target"
 done
+# scripts/lib/ (ctx.py, synonyms.txt — v7 shared helpers, kein *.sh)
+if [ -d "$TEMPLATE_DIR/scripts/lib" ]; then
+  mkdir -p "$CONTEXT_DIR/scripts/lib"
+  cp -r "$TEMPLATE_DIR/scripts/lib/." "$CONTEXT_DIR/scripts/lib/"
+fi
 echo -e "${GREEN}✅   Scripts installiert${NC}"
 
 # Copy check_context_hash.sh
@@ -281,6 +286,93 @@ if [ -f "$TEMPLATE_DIR/check_context_hash.sh" ]; then
   cp "$TEMPLATE_DIR/check_context_hash.sh" "$CONTEXT_DIR/"
   chmod +x "$CONTEXT_DIR/check_context_hash.sh"
 fi
+
+# ---- drawers.yaml (v7 Schubladen-Manifest) — aus erkannter Projektstruktur ----
+# Wandelt einen Auto-detect-Pfad (Verzeichnis oder Datei) in ein Glob-Pattern:
+#   "src/components/" -> "src/components/**" (Verzeichnis, Trailing-Slash)
+#   "**/views.py"      -> unverändert (schon ein Glob)
+#   "src/lib/auth.ts"   -> unverändert (Datei mit Extension)
+#   "handlers"          -> "handlers/**" (bare Verzeichnisname ohne Slash)
+path_to_glob() {
+  local p="$1"
+  case "$p" in
+    *'*'*) printf '%s' "$p" ;;
+    */)    printf '%s**' "$p" ;;
+    *.*)   printf '%s' "$p" ;;
+    *)     printf '%s/**' "$p" ;;
+  esac
+}
+
+generate_drawers_yaml() {
+  local target="$CONTEXT_DIR/drawers.yaml"
+  if [ -f "$target" ]; then
+    echo -e "${YELLOW}⚠️    drawers.yaml existiert bereits — nicht überschrieben${NC}"
+    return
+  fi
+  local ui_glob api_glob auth_glob data_glob state_glob route_glob
+  ui_glob=$(path_to_glob "$UI_PATH")
+  api_glob=$(path_to_glob "$API_PATH")
+  auth_glob=$(path_to_glob "$AUTH_PATH")
+  data_glob=$(path_to_glob "$DB_PATH")
+  state_glob=$(path_to_glob "$STATE_PATH")
+  route_glob=$(path_to_glob "$ROUTE_PATH")
+
+  cat > "$target" << YAML
+# drawers.yaml — Schubladen-Manifest (v7)
+# Auto-generiert von setup_ai_context.sh aus der erkannten Projektstruktur ($STACK).
+# Erweiterbar: eigene Schubladen ergänzen (z.B. payments, emails, cron) —
+# wird nicht überschrieben, wenn diese Datei bereits existiert.
+#
+# locate() (MCP-Tool) nutzt dieses Manifest zum Routing: Query-Keywords
+# treffen eine Schublade -> deren "index"-Datei wird zuerst durchsucht.
+version: "7.0"
+drawers:
+  - id: ui_controls
+    label: "Interaktive UI-Elemente"
+    index: _interaction_map.md
+    match:
+      globs: ["$ui_glob", "$route_glob"]
+      keywords: [button, nav, menu, link, form, click, dropdown, schaltfläche]
+
+  - id: api
+    label: "API-Endpoints"
+    index: backend/endpoints.md
+    match:
+      globs: ["$api_glob"]
+      keywords: [endpoint, route, fetch, api]
+
+  - id: auth
+    label: "Authentifizierung"
+    index: backend/auth.md
+    match:
+      globs: ["$auth_glob"]
+      keywords: [login, session, jwt, auth, anmelden, signin]
+
+  - id: data
+    label: "Datenbank/Schema"
+    index: backend/database.md
+    match:
+      globs: ["$data_glob"]
+      keywords: [schema, migration, db, query, datenbank]
+
+  - id: state
+    label: "Client-State"
+    index: frontend/state.md
+    match:
+      globs: ["$state_glob"]
+      keywords: [store, state, context, redux, zustand]
+
+  - id: infra
+    label: "Infrastruktur/CI"
+    index: decisions.md
+    match:
+      globs: ["Dockerfile", "docker-compose*.yml", ".github/workflows/**"]
+      keywords: [deploy, docker, ci, pipeline, workflow]
+YAML
+  echo -e "${GREEN}✅   drawers.yaml erstellt (${target#$TARGET_DIR/})${NC}"
+}
+
+generate_drawers_yaml
 
 # ---- .claude/settings.json (SessionStart Hook für VS Code, Cursor, JetBrains) ----
 CLAUDE_PROJECT_DIR="$TARGET_DIR/.claude"
@@ -427,6 +519,16 @@ if [ -f "$RAG_CACHE_SCRIPT" ]; then
   fi
 fi
 
+# ---- Generate Symbol Map + Interface Snapshot (v6.6) ----
+if [ -f "$CONTEXT_DIR/scripts/ai-symbol-map.sh" ]; then
+  echo -e "${CYAN}▶ Generiere Symbol Map (_idx/symbols.md)...${NC}"
+  bash "$CONTEXT_DIR/scripts/ai-symbol-map.sh" 2>/dev/null || true
+fi
+if [ -f "$CONTEXT_DIR/scripts/ai-interface-snapshot.sh" ]; then
+  echo -e "${CYAN}▶ Generiere Interface Snapshot (_idx/interfaces.md)...${NC}"
+  bash "$CONTEXT_DIR/scripts/ai-interface-snapshot.sh" 2>/dev/null || true
+fi
+
 # ---- Generate _SESSION.md ----
 echo -e "${CYAN}▶ Generiere _SESSION.md...${NC}"
 bash "$CONTEXT_DIR/scripts/ai-session-prep.sh"
@@ -445,7 +547,7 @@ fi
 # ---- Summary ----
 echo ""
 echo -e "${BOLD}${GREEN}═══════════════════════════════════════════════════${NC}"
-echo -e "${BOLD}${GREEN}  ✅ AI Context v6.3 Setup abgeschlossen!${NC}"
+echo -e "${BOLD}${GREEN}  ✅ AI Context v6.6 Setup abgeschlossen!${NC}"
 echo -e "${BOLD}${GREEN}═══════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${BOLD}⚡ Einfach tippen:${NC} ${GREEN}claude${NC}"
@@ -457,4 +559,6 @@ echo -e "  ${CYAN}ai-context-sync --export${NC}        → Für Claude Chat (Cli
 echo -e "  ${CYAN}ai-registry --find 'auth'${NC}       → Semantische Chunk-Suche"
 echo -e "  ${CYAN}ai-rag --stats${NC}                  → RAG-Cache Statistiken"
 echo -e "  ${CYAN}bash _ai_context/scripts/ai-context-scan.sh${NC} → Projekt neu scannen"
+echo -e "  ${CYAN}bash _ai_context/scripts/ai-symbol-map.sh${NC}  → Symbol Map neu generieren"
+echo -e "  ${CYAN}bash _ai_context/scripts/ai-interface-snapshot.sh${NC} → Interface Snapshot neu generieren"
 echo ""

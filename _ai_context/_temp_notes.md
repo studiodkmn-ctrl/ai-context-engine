@@ -53,3 +53,5 @@ Done this sprint:
 > Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md
 
 - Intent: feat(v7-phase1): shared ctx.py lib + tag-quality/synonym fixes  (2026-07-07) <!-- hash:76f8ff9a4f01 -->
+
+- Intent: feat(v7-phase2): freshness model (seen/code_touched/status)  (2026-07-07) <!-- hash:6b4e518e207f -->

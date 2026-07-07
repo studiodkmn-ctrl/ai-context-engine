@@ -1,5 +1,5 @@
 # Symbol Map — ai-context-v6.5
-> Auto-generiert: 2026-07-07 13:40 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> Auto-generiert: 2026-07-07 13:47 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
 > 10 Dateien · 59 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `context_manager_agent.py`

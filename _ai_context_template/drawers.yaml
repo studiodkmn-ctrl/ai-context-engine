@@ -1,0 +1,53 @@
+# drawers.yaml — Schubladen-Manifest (v7)
+# Generischer Fallback/Referenz-Stand mit Next.js-Defaults. Bei einem echten
+# `bash setup_ai_context.sh` wird diese Datei durch generate_drawers_yaml()
+# projektspezifisch erzeugt (erkannte Next.js/Django/FastAPI/... Pfade statt
+# der generischen Defaults hier) — und NICHT überschrieben, falls sie schon
+# existiert. Erweiterbar: eigene Schubladen ergänzen (z.B. payments, emails,
+# cron) oder Globs/Keywords pro Schublade nachjustieren.
+#
+# locate() (MCP-Tool) nutzt dieses Manifest zum Routing: Query-Keywords
+# treffen eine Schublade -> deren "index"-Datei wird zuerst durchsucht.
+version: "7.0"
+drawers:
+  - id: ui_controls
+    label: "Interaktive UI-Elemente"
+    index: _interaction_map.md
+    match:
+      globs: ["src/components/**", "src/app/**"]
+      keywords: [button, nav, menu, link, form, click, dropdown, schaltfläche]
+
+  - id: api
+    label: "API-Endpoints"
+    index: backend/endpoints.md
+    match:
+      globs: ["src/app/api/**"]
+      keywords: [endpoint, route, fetch, api]
+
+  - id: auth
+    label: "Authentifizierung"
+    index: backend/auth.md
+    match:
+      globs: ["src/lib/auth.ts"]
+      keywords: [login, session, jwt, auth, anmelden, signin]
+
+  - id: data
+    label: "Datenbank/Schema"
+    index: backend/database.md
+    match:
+      globs: ["prisma/schema.prisma"]
+      keywords: [schema, migration, db, query, datenbank]
+
+  - id: state
+    label: "Client-State"
+    index: frontend/state.md
+    match:
+      globs: ["src/store/**"]
+      keywords: [store, state, context, redux, zustand]
+
+  - id: infra
+    label: "Infrastruktur/CI"
+    index: decisions.md
+    match:
+      globs: ["Dockerfile", "docker-compose*.yml", ".github/workflows/**"]
+      keywords: [deploy, docker, ci, pipeline, workflow]

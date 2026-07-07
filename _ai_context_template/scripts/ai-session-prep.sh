@@ -26,6 +26,7 @@ GOTCHAS_FILE="$CONTEXT_DIR/_gotchas.md"
 HASH_SCRIPT="$CONTEXT_DIR/check_context_hash.sh"
 IDX_DIR="$CONTEXT_DIR/_idx"
 HANDOFF_FILE="$CONTEXT_DIR/HANDOFF.md"
+LIB_DIR="$CONTEXT_DIR/scripts/lib"
 
 # Phase B: Impact-Graph aus lokalem Store (lernende Cascade-Beziehungen)
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
@@ -172,37 +173,17 @@ elif [ -n "$CHANGED_FILES" ]; then
   echo "$CHANGED_FILES" | grep -qiE 'test|spec' && SUGGESTED_DOMAIN="${SUGGESTED_DOMAIN:-infra}"
 fi
 
-# ---- Count tokens helper (v5.2 — Code-Block-aware, DE+EN) ----
+# ---- Count tokens helper (v7 — delegiert an scripts/lib/ctx.py, siehe dort) ----
 count_tokens() {
   local file="$1"
   [ ! -f "$file" ] && echo "0" && return
-  python3 - "$file" << 'PYEOF'
-import sys, re
-content = open(sys.argv[1], encoding='utf-8').read()
-# Code-Blöcke: effizienter als Prosa (~0.35 Token/Zeichen)
-code_blocks = re.findall(r'```[\s\S]*?```', content)
-code_chars = sum(len(b) for b in code_blocks)
-prose = re.sub(r'```[\s\S]*?```', '', content)
-# DE/EN-Mix: ~1.8 Token/Wort (konservative Schätzung)
-prose_tokens = int(len(prose.split()) * 1.8)
-code_tokens = int(code_chars * 0.35)
-print(prose_tokens + code_tokens)
-PYEOF
+  python3 "$LIB_DIR/ctx.py" count_tokens < "$file"
 }
 
 # Zählt Tokens aus einem String (nicht Datei)
 count_tokens_str() {
   local content="$1"
-  echo "$content" | python3 - << 'PYEOF'
-import sys, re
-content = sys.stdin.read()
-code_blocks = re.findall(r'```[\s\S]*?```', content)
-code_chars = sum(len(b) for b in code_blocks)
-prose = re.sub(r'```[\s\S]*?```', '', content)
-prose_tokens = int(len(prose.split()) * 1.8)
-code_tokens = int(code_chars * 0.35)
-print(prose_tokens + code_tokens)
-PYEOF
+  printf '%s' "$content" | python3 "$LIB_DIR/ctx.py" count_tokens
 }
 
 # ---- Inkrementeller Cache ----
@@ -370,6 +351,38 @@ if len(lines) > 3:
 PYEOF
 fi
 
+# ---- Phase B+: Symbol Map + Interface Snapshot (v6.6) ----
+# Regeneriert _idx/symbols.md und _idx/interfaces.md wenn Source-Dateien
+# neuer sind als die generierten Dateien — eliminiert 50-70% der Exploration-Reads.
+SYMBOLS_FILE="$IDX_DIR/symbols.md"
+INTERFACES_FILE="$IDX_DIR/interfaces.md"
+SYMBOL_MAP_SCRIPT="$CONTEXT_DIR/scripts/ai-symbol-map.sh"
+INTERFACE_SCRIPT="$CONTEXT_DIR/scripts/ai-interface-snapshot.sh"
+
+_needs_regen() {
+  local target="$1"
+  [ ! -f "$target" ] && return 0
+  # Regen wenn Source neuer als Target (vergleiche mtime)
+  local src_newer
+  src_newer=$(find "$PROJECT_DIR" \( -name "*.ts" -o -name "*.tsx" -o -name "*.py" -o -name "*.go" -o -name "*.rs" \) \
+    -newer "$target" -not -path "*/node_modules/*" -not -path "*/_ai_context/*" \
+    -not -path "*/dist/*" -not -path "*/.next/*" 2>/dev/null | head -1)
+  [ -n "$src_newer" ] && return 0
+  return 1
+}
+
+if [ -f "$SYMBOL_MAP_SCRIPT" ] && ! $MINIMAL_MODE; then
+  if _needs_regen "$SYMBOLS_FILE" || $FORCE_REGEN; then
+    bash "$SYMBOL_MAP_SCRIPT" 2>/dev/null || true
+  fi
+fi
+
+if [ -f "$INTERFACE_SCRIPT" ] && ! $MINIMAL_MODE; then
+  if _needs_regen "$INTERFACES_FILE" || $FORCE_REGEN; then
+    bash "$INTERFACE_SCRIPT" 2>/dev/null || true
+  fi
+fi
+
 # ---- Assemble _SESSION.md ----
 TOTAL_TOKENS=0
 
@@ -394,9 +407,11 @@ Diese Regeln überschreiben das Default-Verhalten und müssen strikt angewendet 
    BEVOR du die Codebase durchsuchst.
 
 2. **Bei Code-Aufgaben** (Route/Komponente/Schema erstellen):
-   Sage zuerst explizit welche Kontextdateien du liest, z.B.:
-   `Ich lese backend/endpoints.md und backend/database.md...`
-   Dann erstelle den Code mit automatisch angewendeten Projektregeln aus Quick Facts.
+   BEVOR du eine Quelldatei komplett liest:
+   a) Suche in `_idx/symbols.md` nach Funktionsname → springe direkt zu Datei:Zeile
+   b) Suche in `_idx/interfaces.md` nach Interface-/Type-Namen → Felder sofort bekannt
+   c) Lies nur die betroffene Stelle, nicht die ganze Datei
+   Sage dann explizit welche Kontextdateien du liest und erstelle Code mit Projektregeln.
 
 3. **Bei Sprint-/Status-Fragen** ("Was haben wir diese Woche gemacht?"):
    Lade `_temp_notes.md` + `git log --since='7 days ago' --oneline`.
@@ -468,6 +483,50 @@ NPM_RULE
     TOTAL_TOKENS=$((TOTAL_TOKENS + T))
   fi
 
+  # Section 0.6: Code-Navigation (v6.6) — Symbol Map + Interface Snapshot + Hot Paths
+  # Zeigt Pointer zu auto-generierten Navigationsdateien + inlined hot_paths wenn vorhanden
+  HOT_PATHS_FILE="$CONTEXT_DIR/hot_paths.md"
+  NAV_SHOWN=false
+
+  if [ -f "$SYMBOLS_FILE" ] || [ -f "$INTERFACES_FILE" ] || [ -f "$HOT_PATHS_FILE" ]; then
+    echo ""
+    echo "## 🧭 Code-Navigation"
+    echo ""
+    NAV_SHOWN=true
+  fi
+
+  if [ -f "$SYMBOLS_FILE" ]; then
+    SYM_COUNT=$(grep -c "^  " "$SYMBOLS_FILE" 2>/dev/null || echo "?")
+    SYM_FILES=$(grep -c "^## \`" "$SYMBOLS_FILE" 2>/dev/null || echo "?")
+    echo "**Symbol Map** (\`_idx/symbols.md\`) — ${SYM_FILES} Dateien, ~${SYM_COUNT} Symbole mit Zeilennummern"
+    echo "> Bevor du eine Datei komplett liest: Suche hier nach Funktionsname → springe direkt zu Datei:Zeile"
+    echo ""
+    T=$(count_tokens "$SYMBOLS_FILE")
+    TOTAL_TOKENS=$((TOTAL_TOKENS + T))
+  fi
+
+  if [ -f "$INTERFACES_FILE" ]; then
+    IFACE_COUNT=$(grep -cE "^[A-Za-z]" "$INTERFACES_FILE" 2>/dev/null || echo "?")
+    echo "**Interface Snapshot** (\`_idx/interfaces.md\`) — ~${IFACE_COUNT} Typen mit Feldern"
+    echo "> Bevor du shared.ts/types.ts liest: Suche hier nach Interface-Namen + Felder"
+    echo ""
+    T=$(count_tokens "$INTERFACES_FILE")
+    TOTAL_TOKENS=$((TOTAL_TOKENS + T))
+  fi
+
+  if [ -f "$HOT_PATHS_FILE" ] && ! grep -q "\[EXAMPLE_PATTERN" "$HOT_PATHS_FILE" 2>/dev/null; then
+    echo "---"
+    echo ""
+    echo "## 🔥 Hot Paths (Kritische Runtime-Invarianten)"
+    echo "> Stabile Nicht-Offensichtliche Muster — einmal lesen, dann nicht mehr rekonstruieren"
+    echo ""
+    # Skip header lines (first 4), show content
+    tail -n +5 "$HOT_PATHS_FILE"
+    echo ""
+    T=$(count_tokens "$HOT_PATHS_FILE")
+    TOTAL_TOKENS=$((TOTAL_TOKENS + T))
+  fi
+
   # Section 1: Quick Facts (always inline)
   if [ -f "$QUICK_FILE" ]; then
     echo ""
@@ -516,7 +575,7 @@ EOF
     if [ -n "$STORED_HASH" ] && [ "$STORED_HASH" != "[GIT_HASH]" ] && [ "$STORED_HASH" != "no-git" ]; then
       while IFS= read -r ctx_md; do
         rel_path="${ctx_md#$PROJECT_DIR/}"
-        file_diff=$(cd "$PROJECT_DIR" && git diff "$STORED_HASH" HEAD -- "$rel_path" 2>/dev/null | grep '^[+-]' | grep -v '^[+-][+-][+-]' | head -5)
+        file_diff=$( (cd "$PROJECT_DIR" && git diff "$STORED_HASH" HEAD -- "$rel_path" 2>/dev/null | grep '^[+-]' | grep -v '^[+-][+-][+-]' | head -5) || true)
         if [ -n "$file_diff" ]; then
           CONTEXT_DIFF="${CONTEXT_DIFF}\n${rel_path}:\n${file_diff}\n"
         fi
@@ -645,7 +704,7 @@ EOF
           | sed 's/,$//' || true)
       fi
 
-      GOTCHA_OUT=$(python3 - "$REGISTRY_FILE" "$CONTEXT_DIR" "${TASK_HINT:-}" "$FULL_MODE" "${OLLAMA_IDS}" "${FEATURE_FILTER:-}" 2>/dev/null << 'PYEOF'
+      GOTCHA_OUT=$(python3 - "$REGISTRY_FILE" "$CONTEXT_DIR" "${TASK_HINT:-}" "$FULL_MODE" "${OLLAMA_IDS}" "${FEATURE_FILTER:-}" "$LIB_DIR" 2>/dev/null << 'PYEOF'
 import sys, re, pathlib
 
 registry_path = sys.argv[1]
@@ -653,34 +712,11 @@ context_dir = pathlib.Path(sys.argv[2])
 task_hint = sys.argv[3].lower() if len(sys.argv) > 3 else ''
 full_mode = (sys.argv[4].lower() == 'true') if len(sys.argv) > 4 else False
 
-# Registry parsen (line-by-line, kein yaml-Modul erforderlich)
-chunks = []
-current = {}
-with open(registry_path, encoding='utf-8') as f:
-    for line in f:
-        s = line.strip()
-        if s.startswith('- id:'):
-            if current.get('id'):
-                chunks.append(current)
-            current = {'id': s.split(':',1)[1].strip(), 'type':'', 'priority':2,
-                       'file':'', 'anchor':'', 'tags':[], 'tokens':0}
-        elif s.startswith('type:') and current:
-            current['type'] = s.split(':',1)[1].strip()
-        elif s.startswith('priority:') and current:
-            try: current['priority'] = int(s.split(':',1)[1].strip())
-            except: pass
-        elif s.startswith('file:') and current:
-            current['file'] = s.split(':',1)[1].strip()
-        elif s.startswith('anchor:') and current:
-            current['anchor'] = s.split(':',1)[1].strip()
-        elif s.startswith('tags:') and current:
-            tags_raw = s.split(':',1)[1].strip().strip('[]')
-            current['tags'] = [t.strip() for t in tags_raw.split(',') if t.strip()]
-        elif s.startswith('tokens:') and current:
-            try: current['tokens'] = int(s.split(':',1)[1].strip())
-            except: pass
-    if current.get('id'):
-        chunks.append(current)
+sys.path.insert(0, sys.argv[7])
+import ctx as ctxlib  # scripts/lib/ctx.py — shared registry/token/chunk helpers (v7)
+
+# Registry parsen (ctx.py, kein yaml-Modul erforderlich)
+chunks = ctxlib.parse_registry(registry_path)['chunks']
 
 KNOWLEDGE_TYPES = {'gotcha', 'debug', 'security', 'rule'}
 knowledge_chunks = [c for c in chunks if c['type'] in KNOWLEDGE_TYPES]
@@ -734,16 +770,8 @@ if full_mode:
     inline_ids = {c['id'] for c in knowledge_chunks}
 
 def extract_chunk(chunk_id, file_rel):
-    """Chunk-Text zwischen HTML-Ankern extrahieren."""
-    fpath = context_dir / file_rel
-    if not fpath.exists():
-        return None
-    content = fpath.read_text(encoding='utf-8')
-    m = re.search(
-        r'<!-- #' + re.escape(chunk_id) + r' -->\n([\s\S]*?)<!-- /' + re.escape(chunk_id) + r' -->',
-        content, re.MULTILINE
-    )
-    return m.group(1).strip() if m else None
+    """Chunk-Text zwischen HTML-Ankern extrahieren (ctx.py, ohne .strip())."""
+    return ctxlib.extract_chunk(str(context_dir / file_rel), chunk_id)
 
 inline_parts = []
 pointer_parts = []
@@ -755,24 +783,17 @@ for c in knowledge_chunks:
             inline_parts.append(text)
     else:
         # Kurzbeschreibung NUR aus Chunk-Inhalt (nicht aus ganzer Datei)
-        fpath = context_dir / c['file']
         desc = ''
-        if fpath.exists():
-            fc = fpath.read_text(encoding='utf-8')
-            chunk_m = re.search(
-                r'<!-- #' + re.escape(c['id']) + r' -->\n([\s\S]*?)<!-- /' + re.escape(c['id']) + r' -->',
-                fc, re.MULTILINE
-            )
-            if chunk_m:
-                chunk_text = chunk_m.group(1)
-                # → Zeile bevorzugen, sonst scope/violates
-                arrow_m = re.search(r'→\s*([^\n]+)', chunk_text)
-                if arrow_m:
-                    desc = arrow_m.group(1)[:55]
-                else:
-                    fallback_m = re.search(r'(?:scope|violates):\s*([^\n]+)', chunk_text)
-                    if fallback_m:
-                        desc = fallback_m.group(1)[:55]
+        chunk_text = extract_chunk(c['id'], c['file'])
+        if chunk_text:
+            # → Zeile bevorzugen, sonst scope/violates
+            arrow_m = re.search(r'→\s*([^\n]+)', chunk_text)
+            if arrow_m:
+                desc = arrow_m.group(1)[:55]
+            else:
+                fallback_m = re.search(r'(?:scope|violates):\s*([^\n]+)', chunk_text)
+                if fallback_m:
+                    desc = fallback_m.group(1)[:55]
         pointer_parts.append(f"⇒ {c['id']} — {desc} [P{c['priority']}]")
 
 total = len(knowledge_chunks)
@@ -923,6 +944,8 @@ PYEOF
 ```
 ROUTER:   Micro-Index → Domain-Index → Kontextdatei (max 3 Dateien pro Kette)
 LADEN:    Max 4 Dateien pro Session gesamt
+NAVIGATE: Vor Datei-Read → _idx/symbols.md (Funktion → Zeile) + _idx/interfaces.md (Typen)
+HOTPATHS: hot_paths.md lesen statt Invarianten aus Code rekonstruieren
 GOTCHAS:  Immer bei Coding-Tasks (oben inline wenn vorhanden)
 WRITE:    Nach jeder Aufgabe → relevante Kontextdatei + Domain-Index Status aktualisieren
 DEDUP:    Vor Writeback IDs prüfen → Update statt Duplikat

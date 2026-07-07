@@ -58,6 +58,9 @@ import sys, re, pathlib, subprocess
 ctx = pathlib.Path(sys.argv[1])
 proj = pathlib.Path(sys.argv[2])
 
+sys.path.insert(0, sys.argv[3])
+import ctx as ctxlib  # scripts/lib/ctx.py — shared token/registry/freshness helpers (v7)
+
 KNOWLEDGE = ['_gotchas.md', 'debug_patterns.md', 'security.md', 'testing.md',
              'backend/auth.md', 'backend/database.md', 'backend/endpoints.md',
              'frontend/components.md', 'frontend/state.md', 'frontend/routing.md']
@@ -79,10 +82,7 @@ def rel(p):
     return str(p.relative_to(ctx))
 
 def est_tokens(text):
-    code = re.findall(r'```[\s\S]*?```', text)
-    code_chars = sum(len(b) for b in code)
-    prose = re.sub(r'```[\s\S]*?```', '', text)
-    return int(len(prose.split()) * 1.8) + int(code_chars * 0.35)
+    return ctxlib.count_tokens(text)
 
 # ---- alle Anker projektweit sammeln (für Pointer-Check) ----
 all_anchors = set()
@@ -362,7 +362,7 @@ portable_hash() {
 # ---- Checks ausführen → REPORT ----
 run_checks() {
   : > "$REPORT"
-  python3 "$CHECKER" "$CONTEXT_DIR" "$PROJECT_DIR" >> "$REPORT" 2>/dev/null
+  python3 "$CHECKER" "$CONTEXT_DIR" "$PROJECT_DIR" "$SCRIPT_DIR/lib" >> "$REPORT" 2>/dev/null
   # Check 8: Regel-Konflikte — bestehendes Tool wiederverwenden
   local hash_tool="$CONTEXT_DIR/check_context_hash.sh"
   if [ -f "$hash_tool" ]; then

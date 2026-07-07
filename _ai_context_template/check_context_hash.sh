@@ -40,7 +40,7 @@ fi
 if [ "${1:-}" = "--dedup" ]; then
   TARGET_FILE="${2:-$CONTEXT_DIR/_gotchas.md}"
   echo -e "${CYAN}🔍 Deduplication-Check: $(basename "$TARGET_FILE")${NC}"
-  python3 - "$TARGET_FILE" << 'PYEOF'
+  python3 - "$TARGET_FILE" "$CONTEXT_DIR/scripts/lib" << 'PYEOF'
 import re, sys, itertools, pathlib
 
 fpath = pathlib.Path(sys.argv[1])
@@ -48,15 +48,15 @@ if not fpath.exists():
     print("Datei nicht gefunden:", sys.argv[1])
     sys.exit(1)
 
+sys.path.insert(0, sys.argv[2])
+import ctx as ctxlib  # scripts/lib/ctx.py — konsolidierte STOPWORDS (v7)
+
 content = fpath.read_text(encoding='utf-8')
 blocks = re.findall(r'```\s*\n((?:ID:|RULE:)[\s\S]*?)```', content)
 
 def extract_keywords(text):
     words = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]{2,}', text.lower())
-    stopwords = {'the', 'and', 'for', 'ist', 'der', 'die', 'das', 'bei', 'von',
-                 'mit', 'nicht', 'wird', 'kann', 'alle', 'scope', 'pattern',
-                 'violates', 'return', 'import', 'from', 'this', 'that'}
-    return set(w for w in words if w not in stopwords and len(w) > 3)
+    return set(w for w in words if w not in ctxlib.STOPWORDS_DE_EN and len(w) > 3)
 
 def jaccard(s1, s2):
     if not s1 or not s2:

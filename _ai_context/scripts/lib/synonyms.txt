@@ -1,0 +1,8 @@
+# synonyms.txt — Tag-Synonym-Aliase (v7)
+# Format: wort=alias1,alias2,...  (# = Kommentar, leere Zeilen ignoriert)
+# Wird von ai-context-registry.sh --scan und mcp/src/lib/locate.ts genutzt,
+# damit z.B. eine Suche nach "schaltfläche" auch "button"-Tags findet.
+button=schaltfläche,btn
+login=anmelden,signin,sign-in
+nav=navigation,menu,menü
+fehler=error,bug

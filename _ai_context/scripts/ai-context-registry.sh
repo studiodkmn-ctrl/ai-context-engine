@@ -35,13 +35,19 @@ if [ "${1:-}" = "--scan" ]; then
   PROJECT_NAME=$(basename "$(cd "$CONTEXT_DIR/.." && pwd)")
 
   # Python schreibt registry.yaml und gibt Zusammenfassung auf stdout aus
-  SCAN_RESULT=$(python3 - "$CONTEXT_DIR" "$PROJECT_NAME" "$TODAY" "$DATE_SHORT" 2>/dev/null << 'PYEOF'
+  SCAN_RESULT=$(python3 - "$CONTEXT_DIR" "$PROJECT_NAME" "$TODAY" "$DATE_SHORT" "$SCRIPT_DIR/lib" 2>/dev/null << 'PYEOF'
 import sys, re, pathlib, hashlib
 
-ctx = pathlib.Path(sys.argv[1])
+ctx_dir = pathlib.Path(sys.argv[1])
 project_name = sys.argv[2]
 generated = sys.argv[3]
 date_short = sys.argv[4]
+lib_dir = sys.argv[5]
+
+sys.path.insert(0, lib_dir)
+import ctx as ctxlib  # scripts/lib/ctx.py — shared token/tag/freshness helpers (v7)
+
+synonyms = ctxlib.load_synonyms(str(pathlib.Path(lib_dir) / "synonyms.txt"))
 
 KNOWLEDGE_FILES = [
     ("_gotchas.md",            "gotcha"),
@@ -58,24 +64,15 @@ KNOWLEDGE_FILES = [
     ("decisions.md",           "arch"),
 ]
 
-STOPWORDS = {
-    'the','and','for','ist','der','die','das','bei','von','mit','nicht',
-    'wird','kann','alle','src','lib','use','new','get','set','add','run',
-    'via','nur','immer','oder','api','file','node','statt','ohne','nach',
-    'kein','import','from','this','that','with','scope','pattern',
-    'violates','return','func','just','only',
-}
-
-ANCHOR_RE = re.compile(
-    r'<!-- #(\w+) -->\n([\s\S]*?)<!-- /\1 -->',
-    re.MULTILINE
-)
+# STOPWORDS + Token-Schätzung + Tag-Extraktion leben jetzt in scripts/lib/ctx.py
+# (v7 — vorher hier + check_context_hash.sh + ai-session-prep.sh dupliziert).
+ANCHOR_RE = ctxlib.ANCHOR_RE
 
 chunks = []
 no_anchor_files = []
 
 for rel_file, chunk_type in KNOWLEDGE_FILES:
-    fpath = ctx / rel_file
+    fpath = ctx_dir / rel_file
     if not fpath.exists():
         continue
     content = fpath.read_text(encoding='utf-8')
@@ -98,23 +95,11 @@ for rel_file, chunk_type in KNOWLEDGE_FILES:
         pm = re.search(r'\nP:\s*([123])', text)
         priority = int(pm.group(1)) if pm else 2
 
-        # Tags aus Schlüsselzeilen
-        words = set()
-        for lp in [r'→\s*([^\n]+)', r'@\s*([^\n]+)', r'scope:\s*([^\n]+)']:
-            lm = re.search(lp, text)
-            if lm:
-                words.update(re.findall(r'[a-zA-Z][a-zA-Z0-9_-]{2,}', lm.group(1).lower()))
-        words.update(p for p in re.split(r'[_\-]', cid.lower()) if len(p) > 2)
-        tags = sorted(
-            w for w in words
-            if w not in STOPWORDS and len(w) > 2 and w.replace('-', '').isalpha()
-        )[:8]
+        # Tags aus Schlüsselzeilen (Stopwords + Min-4-Zeichen + Synonym-Expansion, ctx.py)
+        tags = ctxlib.extract_tags_from_chunk(cid, text, synonyms)
 
-        # Token-Schätzung (identisch zu ai-session-prep.sh)
-        code_blocks = re.findall(r'```[\s\S]*?```', text)
-        code_chars = sum(len(b) for b in code_blocks)
-        prose = re.sub(r'```[\s\S]*?```', '', text)
-        tokens = max(int(len(prose.split()) * 1.8) + int(code_chars * 0.35), 5)
+        # Token-Schätzung (ctx.py — identische Formel wie zuvor)
+        tokens = max(ctxlib.count_tokens(text), 5)
 
         # SHA1-Hash
         chunk_hash = 'sha1:' + hashlib.sha1(text.encode('utf-8')).hexdigest()[:8]
@@ -156,7 +141,7 @@ else:
             "",
         ]
 
-(ctx / 'registry.yaml').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+(ctx_dir / 'registry.yaml').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 # Ergebnis ausgeben (für bash-Parsing)
 print(f"CHUNKS:{len(chunks)}")

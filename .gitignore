@@ -7,6 +7,10 @@ _ai_context/registry.yaml
 .DS_Store
 **/.DS_Store
 
+# Python bytecode cache (scripts/lib/ctx.py etc.)
+__pycache__/
+*.pyc
+
 # Local Claude settings (personal, not for repo)
 .claude/settings.local.json
 

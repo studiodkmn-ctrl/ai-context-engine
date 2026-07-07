@@ -53,6 +53,12 @@ graph_path = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 else None
 temporal_suspect = sys.argv[4] if len(sys.argv) > 4 else ''
 temporal_date    = sys.argv[5] if len(sys.argv) > 5 else ''
 
+if len(sys.argv) > 6:
+    sys.path.insert(0, sys.argv[6])
+    import ctx as ctxlib  # scripts/lib/ctx.py — Chunk-Block-Parsing (v7)
+else:
+    ctxlib = None
+
 STOP = {'the', 'a', 'an', 'is', 'are', 'not', 'does', 'doesnt', 'do', 'my',
         'on', 'in', 'at', 'to', 'it', 'this', 'that', 'when', 'and', 'or',
         'der', 'die', 'das', 'ein', 'eine', 'und', 'oder', 'nicht', 'kein',
@@ -112,7 +118,9 @@ def parse_chunks(filename):
     if not fp.exists():
         return chunks
     text = fp.read_text(encoding='utf-8', errors='ignore')
-    for block in re.findall(r'```\s*\n((?:ID:|RULE:)[\s\S]*?)```', text):
+    blocks = ctxlib.parse_chunk_blocks(text) if ctxlib else \
+        re.findall(r'```\s*\n((?:ID:|RULE:)[\s\S]*?)```', text)
+    for block in blocks:
         idm = re.search(r'(?:ID:|RULE:)\s*(\S+)', block)
         pm = re.search(r'\nP:\s*([123])', block)
         symptom = ''
@@ -250,4 +258,4 @@ print('__ROUTER__:' + ('|'.join(to_read[:5]) if to_read else 'none'))
 PYEOF
 
 python3 "$ROUTER_PY" "$CONTEXT_DIR" "$QUERY" "$IMPACT_GRAPH" \
-    "$TEMPORAL_SUSPECT" "$TEMPORAL_DATE"
+    "$TEMPORAL_SUSPECT" "$TEMPORAL_DATE" "$CONTEXT_DIR/scripts/lib"

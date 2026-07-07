@@ -26,6 +26,21 @@ if [ -z "$QUERY" ]; then
   exit 1
 fi
 
+# temporal pre-filter — defensiv, router darf nicht brechen
+TEMPORAL_SUSPECT=""
+TEMPORAL_DATE=""
+_WHENBROKE="$(dirname "${BASH_SOURCE[0]}")/ai-when-broke.sh"
+if [ -x "$_WHENBROKE" ]; then
+  _TBOUT=$(bash "$_WHENBROKE" 2>/dev/null) || true
+  if [ -n "$_TBOUT" ]; then
+    _TS=$(printf '%s' "$_TBOUT" | grep "^SUSPECT:" | head -1 | sed 's/SUSPECT: //;s/[(].*//' | xargs)
+    _TD=$(printf '%s' "$_TBOUT" | grep "^BROKE_WINDOW:" | head -1 | awk '{print $NF}')
+    # Nur echte Dateipfade übernehmen (mit Punkt, kein Leerstring)
+    case "$_TS" in *.*) TEMPORAL_SUSPECT="$_TS" ;; *) TEMPORAL_SUSPECT="" ;; esac
+    TEMPORAL_DATE="${_TD:-}"
+  fi
+fi
+
 ROUTER_PY="$(mktemp -t aictx-router.XXXXXX.py)"
 trap 'rm -f "$ROUTER_PY"' EXIT
 
@@ -35,6 +50,14 @@ import sys, re, pathlib
 context_dir = pathlib.Path(sys.argv[1])
 query = sys.argv[2]
 graph_path = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 else None
+temporal_suspect = sys.argv[4] if len(sys.argv) > 4 else ''
+temporal_date    = sys.argv[5] if len(sys.argv) > 5 else ''
+
+if len(sys.argv) > 6:
+    sys.path.insert(0, sys.argv[6])
+    import ctx as ctxlib  # scripts/lib/ctx.py — Chunk-Block-Parsing (v7)
+else:
+    ctxlib = None
 
 STOP = {'the', 'a', 'an', 'is', 'are', 'not', 'does', 'doesnt', 'do', 'my',
         'on', 'in', 'at', 'to', 'it', 'this', 'that', 'when', 'and', 'or',
@@ -95,7 +118,9 @@ def parse_chunks(filename):
     if not fp.exists():
         return chunks
     text = fp.read_text(encoding='utf-8', errors='ignore')
-    for block in re.findall(r'```\s*\n((?:ID:|RULE:)[\s\S]*?)```', text):
+    blocks = ctxlib.parse_chunk_blocks(text) if ctxlib else \
+        re.findall(r'```\s*\n((?:ID:|RULE:)[\s\S]*?)```', text)
+    for block in blocks:
         idm = re.search(r'(?:ID:|RULE:)\s*(\S+)', block)
         pm = re.search(r'\nP:\s*([123])', block)
         symptom = ''
@@ -139,6 +164,10 @@ gotcha_hits = [(s, c) for s, c in gotcha_hits if s > 0][:3]
 
 print(f'\U0001f50e Symptom-Router — "{query}"')
 print()
+
+if temporal_suspect:
+    print(f'TEMPORAL: Verdacht auf {temporal_suspect} (kaputt seit {temporal_date})')
+    print()
 
 print('INTERACTION MAP:')
 if map_state == 'missing':
@@ -192,6 +221,11 @@ for s, c in debug_hits:
         if f and '.' in f and f not in to_read:
             to_read.append(f)
 
+if temporal_suspect:
+    if temporal_suspect in to_read:
+        to_read.remove(temporal_suspect)
+    to_read.insert(0, temporal_suspect)
+
 print('EMPFOHLEN ZU LESEN (in dieser Reihenfolge):')
 if to_read:
     for f in to_read[:5]:
@@ -223,4 +257,5 @@ print()
 print('__ROUTER__:' + ('|'.join(to_read[:5]) if to_read else 'none'))
 PYEOF
 
-python3 "$ROUTER_PY" "$CONTEXT_DIR" "$QUERY" "$IMPACT_GRAPH"
+python3 "$ROUTER_PY" "$CONTEXT_DIR" "$QUERY" "$IMPACT_GRAPH" \
+    "$TEMPORAL_SUSPECT" "$TEMPORAL_DATE" "$CONTEXT_DIR/scripts/lib"

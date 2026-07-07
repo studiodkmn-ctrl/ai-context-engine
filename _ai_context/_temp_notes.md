@@ -55,3 +55,9 @@ Done this sprint:
 - Intent: feat(v7-phase1): shared ctx.py lib + tag-quality/synonym fixes  (2026-07-07) <!-- hash:76f8ff9a4f01 -->
 
 - Intent: feat(v7-phase2): freshness model (seen/code_touched/status)  (2026-07-07) <!-- hash:6b4e518e207f -->
+
+- Intent: feat(v7-phase3): drawers.yaml content-routing manifest  (2026-07-07) <!-- hash:19bc12e214bf -->
+
+- Testfakt SMOKE-1783421807316: stdio MCP funktioniert  (2026-07-07) <!-- hash:19a066365c26 -->
+
+- Testfakt SMOKE-1783421960409: stdio MCP funktioniert  (2026-07-07) <!-- hash:5f889daee693 -->

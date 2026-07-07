@@ -24,8 +24,8 @@ console.log(`MCP verbunden — Kontext: ${projectRoot}\n`);
 const { tools } = await client.listTools();
 const names = tools.map(t => t.name).sort();
 console.log('Tools:', names.join(', '));
-const expected = ['capture_from_diff', 'memory_save', 'memory_search', 'session_context'];
-if (JSON.stringify(names) === JSON.stringify(expected)) pass('genau 4 Tools registriert');
+const expected = ['capture_from_diff', 'locate', 'memory_save', 'memory_search', 'session_context'];
+if (JSON.stringify(names) === JSON.stringify(expected)) pass('genau 5 Tools registriert');
 else fail(`falsche Tools: ${names.join(',')}`);
 
 const callText = async (name, args = {}) => {
@@ -62,6 +62,11 @@ searchRes.includes(marker) ? pass('memory_search findet gespeicherten Fakt') : f
 // 5) memory_search ohne Treffer → leer/graceful
 const empty = await callText('memory_search', { query: 'zxqwvbnmplkjhgfdsa-unfindbar' });
 empty.includes('Kein Treffer') ? pass('Leersuche graceful') : fail('Leersuche unerwartet: ' + empty);
+
+// 5b) locate — findet den prisma_singleton-Gotcha per Symptom-Match
+const locateRes = await callText('locate', { query: 'prisma pool voll' });
+console.log('\n[locate prisma]\n' + locateRes.slice(0, 240));
+locateRes.includes('prisma_singleton') ? pass('locate findet prisma_singleton') : fail('locate fand prisma_singleton nicht: ' + locateRes);
 
 // 6) capture_from_diff (nur Vorschlag-Modus, darf auch leer sein)
 const cap = await callText('capture_from_diff', {});

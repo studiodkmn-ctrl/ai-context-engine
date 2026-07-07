@@ -26,6 +26,16 @@ if [ -z "$QUERY" ]; then
   exit 1
 fi
 
+# v7: locate() (MCP-Lib, TypeScript) ersetzt die Python-Router-Logik unten —
+# dünner Wrapper, sucht zuerst lokal (dieses Repo selbst), dann global
+# (~/.ai-context/mcp, wohin install.sh den MCP-Server für Zielprojekte baut).
+# Fallback auf die alte Bash/Python-Logik nur wenn node/dist fehlt.
+for _CANDIDATE in "$CONTEXT_DIR/../mcp/dist/locate-cli.js" "$HOME/.ai-context/mcp/dist/locate-cli.js"; do
+  if [ -f "$_CANDIDATE" ] && command -v node >/dev/null 2>&1; then
+    exec node "$_CANDIDATE" "$QUERY"
+  fi
+done
+
 # temporal pre-filter — defensiv, router darf nicht brechen
 TEMPORAL_SUSPECT=""
 TEMPORAL_DATE=""

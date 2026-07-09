@@ -79,3 +79,5 @@ Done this sprint:
 - Intent: fix(v7): production-readiness pass — missing template files + 3 bugs  (2026-07-09) <!-- hash:f78c2caa928b -->
 
 - Intent: fix(v7): require colon/paren after TODO markers in capture heuristic  (2026-07-09) <!-- hash:c10003beb83e -->
+
+- Intent: fix(v7): locate registry fallback, hook local-first, global install refresh  (2026-07-09) <!-- hash:dfaca3c9fdcd -->

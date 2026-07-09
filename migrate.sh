@@ -97,7 +97,11 @@ for script in "${NEW_SCRIPTS[@]}"; do
   fi
 done
 
-# Modifizierte Scripts aktualisieren (v6.5/v7 bringen neue Sektionen)
+# Kern-Scripts aktualisieren/installieren (v6.5/v7 bringen neue Sektionen).
+# IMMER kopieren, nicht nur wenn schon vorhanden: ein v5.x-Projekt hat z.B.
+# kein ai-context-registry.sh — ohne das gäbe es nach der Migration keine
+# registry.yaml und damit (seit v7 der Rohtext-Fallback weg ist) GAR KEINE
+# Gotchas mehr in _SESSION.md.
 UPDATED_SCRIPTS=(
   "ai-session-prep.sh"
   "ai-context-registry.sh"
@@ -111,7 +115,7 @@ UPDATED_SCRIPTS=(
 for script in "${UPDATED_SCRIPTS[@]}"; do
   src="$SRC_TEMPLATE/scripts/$script"
   dst="_ai_context/scripts/$script"
-  if [ -f "$src" ] && [ -f "$dst" ]; then
+  if [ -f "$src" ]; then
     cp "$src" "$dst"
     chmod +x "$dst"
     echo -e "   🔄 $script (aktualisiert)"
@@ -402,7 +406,10 @@ fi
 
 # Registry neu scannen: trägt seen/code_touched/status für alle Chunks nach
 # (bestehende Chunks ohne seen: → seen = bisheriges updated-Datum, additiv).
+# Vorher Anker injizieren — v5.x-Projekte haben ID:-Blöcke ohne HTML-Anker,
+# die der Scan sonst nicht indexieren kann.
 if [ -f "_ai_context/scripts/ai-context-registry.sh" ]; then
+  bash "_ai_context/scripts/ai-context-registry.sh" --add-anchors 2>/dev/null || true
   bash "_ai_context/scripts/ai-context-registry.sh" --scan 2>/dev/null || true
   echo -e "   ${GREEN}✅ registry.yaml${NC} neu gescannt (seen/code_touched/status)"
 fi

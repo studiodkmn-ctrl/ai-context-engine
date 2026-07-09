@@ -1,6 +1,6 @@
 # Symbol Map — ai-context-v6.5
-> Auto-generiert: 2026-07-09 22:04 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
-> 12 Dateien · 84 Symbole · Direkt springen: Datei:Zeilennummer
+> Auto-generiert: 2026-07-09 22:11 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> 12 Dateien · 85 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `context_manager_agent.py`
   ProjectMetadata                     L37    
@@ -43,19 +43,20 @@
   parseInteractionMap                 L134   
   scoreMapRow                         L159   
   parseRegistry                       L187   
-  extractChunkBody                    L224   
-  escapeRe                            L237   
-  symptomLine                         L241   
-  extractAtFiles                      L247     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
-  scoreChunk                          L253   
-  freshnessNote                       L261   
-  parseSymbols                        L276   
-  parseInterfaces                     L312   
-  parseInvariants                     L341   
-  parseImpactGraph                    L371     — ------------------------------------------------------------
-  locateQuery                         L401   
-  boost                               L436     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
-  addFile                             L548   
+  chunksFromMarkdownFallback          L245   
+  extractChunkBody                    L269   
+  escapeRe                            L282   
+  symptomLine                         L286   
+  extractAtFiles                      L292     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
+  scoreChunk                          L298   
+  freshnessNote                       L306   
+  parseSymbols                        L321   
+  parseInterfaces                     L357   
+  parseInvariants                     L386   
+  parseImpactGraph                    L416     — ------------------------------------------------------------
+  locateQuery                         L446   
+  boost                               L486     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
+  addFile                             L598   
 ## `mcp/src/lib/paths.ts`
   findProjectRoot                     L9     
   localContextDir                     L23      — Pfad zum projektlokalen `_ai_context`-Ordner.

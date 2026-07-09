@@ -13,7 +13,7 @@ Nächstes:       [Was als nächstes ansteht]
 ```
 Stack:    Test
 Phase:    Beta
-Git:      ec461bb32a2e6616c6ad52175f78f9fe86b0c40c
+Git:      67e8834cc898f1e1718d2de67b952ffc3218da9c
 Session:  2026-07-09
 ```
 
@@ -25,3 +25,7 @@ Session:  2026-07-09
 | `backend/auth.md` | Auth | 🟢 | 14.04 |
 | `backend/endpoints.md` | API | 🟢 | 14.04 |
 | `security.md` | Security | 🟢 | 14.04 |
+
+## 📦 Schubladen (Archiv-Pointer)
+```
+`frontend/state_extended.md`  ← Erweiterte Einträge. Core: `frontend/state_core.md````

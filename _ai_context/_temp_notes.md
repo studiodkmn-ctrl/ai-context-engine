@@ -71,3 +71,7 @@ Done this sprint:
 - Intent: feat(v7-phase6): session-start entschlacken  (2026-07-09) <!-- hash:6a37e0c4ed35 -->
 
 - Testfakt SMOKE-1783622207717: stdio MCP funktioniert  (2026-07-09) <!-- hash:14e5387e7703 -->
+
+- Intent: docs(v7-phase7): README/CLAUDE.md v7 docs, VERSION 7.0.0, migrate.sh  (2026-07-09) <!-- hash:0e890808f8e8 -->
+
+- Testfakt SMOKE-1783623732604: stdio MCP funktioniert  (2026-07-09) <!-- hash:4eb0574fd10a -->

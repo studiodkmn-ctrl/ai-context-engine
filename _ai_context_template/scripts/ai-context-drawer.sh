@@ -215,7 +215,14 @@ else
   DRAWER_INDEXES=$'frontend/components.md\nfrontend/state.md\nbackend/endpoints.md\nbackend/database.md\nbackend/auth.md'
 fi
 while IFS= read -r check_file; do
-  [ -n "$check_file" ] && split_domain_file "$check_file" 80
+  [ -z "$check_file" ] && continue
+  # Nur Domain-Unterordner-Dateien splitten (frontend/*, backend/*, ...) —
+  # Top-Level-Indizes wie _interaction_map.md (auto-generiert, wird eh neu
+  # gebaut) oder decisions.md (ADRs mittig zu zerschneiden ist destruktiv)
+  # sind zwar drawer-Indizes, aber KEINE Split-Kandidaten.
+  case "$check_file" in
+    */*) split_domain_file "$check_file" 80 ;;
+  esac
 done <<< "$DRAWER_INDEXES"
 
 # 3. _ai_index.md mit Schubladen-Pointern aktualisieren

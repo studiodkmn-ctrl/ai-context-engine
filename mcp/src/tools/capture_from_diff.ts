@@ -113,8 +113,8 @@ function analyze(diff: string): Suggestion[] {
       continue;
     }
 
-    // TODO / FIXME / HACK → Gotcha
-    const todo = /\b(TODO|FIXME|HACK|XXX)\b[:\s]*(.+)/.exec(line);
+    // TODO / FIXME / HACK → Gotcha (nur Code — TODOs in Doku sind Prosa, kein Schulden-Marker)
+    const todo = isCode && /\b(TODO|FIXME|HACK|XXX)\b[:\s]*(.+)/.exec(line);
     if (todo && todo[2]) {
       push('gotcha', `${todo[1]}: ${todo[2].trim()}  (@ ${currentFile})`);
       continue;

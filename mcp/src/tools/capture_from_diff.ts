@@ -113,8 +113,11 @@ function analyze(diff: string): Suggestion[] {
       continue;
     }
 
-    // TODO / FIXME / HACK → Gotcha (nur Code — TODOs in Doku sind Prosa, kein Schulden-Marker)
-    const todo = isCode && /\b(TODO|FIXME|HACK|XXX)\b[:\s]*(.+)/.exec(line);
+    // Schulden-Marker → Gotcha. Nur Code (Doku ist Prosa) UND nur die
+    // echte Marker-Syntax mit Doppelpunkt/Klammer — sonst matcht jede
+    // Codezeile, die das Wort bloß erwähnt (z.B. diese Regex hier selbst,
+    // die sich der Hook beim v7-Commit prompt als "Gotcha" notiert hat).
+    const todo = isCode && /\b(TODO|FIXME|HACK|XXX)\s*[:(]\s*(.+)/.exec(line);
     if (todo && todo[2]) {
       push('gotcha', `${todo[1]}: ${todo[2].trim()}  (@ ${currentFile})`);
       continue;

@@ -1,4 +1,4 @@
-# Interaction Map — [PROJECT_NAME]
+# Interaction Map — ai-context-engine
 > **Auto-generiert von `ai-context-map.sh`. Nicht manuell editieren.**
 > Zweck: Bug in einem UI-Element -> Ursache in 1 Lookup (statt grep-from-scratch).
 > Regeneriert via post-commit Hook bei Komponenten-Änderungen.

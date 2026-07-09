@@ -288,8 +288,13 @@ fi
 
 # ---- MCP Auto-Capture (Phase 2): Wissen aus dem Commit-Diff ins Gedächtnis ----
 # Schlanke CLI statt MCP-Handshake. Bricht den Commit nie ab (|| true).
-CAPTURE_CLI="$HOME/.ai-context/mcp/dist/capture-cli.js"
-if [ -f "$CAPTURE_CLI" ] && command -v node > /dev/null 2>&1; then
+# v7: Repo-lokaler Build hat Vorrang (im ai-context-engine-Repo selbst ist
+# der aktueller als die globale Install-Kopie) — sonst global.
+CAPTURE_CLI=""
+for _cand in "$CONTEXT_DIR/../mcp/dist/capture-cli.js" "$HOME/.ai-context/mcp/dist/capture-cli.js"; do
+  [ -f "$_cand" ] && CAPTURE_CLI="$_cand" && break
+done
+if [ -n "$CAPTURE_CLI" ] && command -v node > /dev/null 2>&1; then
   ( cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" \
       && node "$CAPTURE_CLI" --apply "HEAD~1..HEAD" ) > /dev/null 2>&1 || true
 fi

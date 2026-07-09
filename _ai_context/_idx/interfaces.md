@@ -1,5 +1,5 @@
 # Interface Snapshot — ai-context-v6.5
-> Auto-generiert: 2026-07-07 14:05 | Neu generieren: `bash _ai_context/scripts/ai-interface-snapshot.sh`
+> Auto-generiert: 2026-07-09 22:04 | Neu generieren: `bash _ai_context/scripts/ai-interface-snapshot.sh`
 > 16 Interfaces/Types — Format: `Name  Datei:Zeile  Felder`
 
 ProjectMetadata                 context_manager_agent.py:37          project_name, project_description, stack, folder_structure, generated_files, architecture_decisions, api_routes, db_models
@@ -16,5 +16,5 @@ SaveResult                      mcp/src/lib/save.ts:16               saved, file
 SearchHit                       mcp/src/lib/search.ts:4              file, relFile, line, snippet, score, source, project?
 Source                          mcp/src/lib/search.ts:87             dir, kind, project?, relFile, line, snippet, source, project
 Suggestion                      mcp/src/tools/capture_from_diff.ts:9  type, content, name, config, title, description, inputSchema, apply
-InvariantDep                    mcp/src/tools/capture_from_diff.ts:190  type, ref, id, level, rule, scope, depends
-Invariant                       mcp/src/tools/capture_from_diff.ts:195  id, level, rule, scope, depends
+InvariantDep                    mcp/src/tools/capture_from_diff.ts:193  type, ref, id, level, rule, scope, depends
+Invariant                       mcp/src/tools/capture_from_diff.ts:198  id, level, rule, scope, depends

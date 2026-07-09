@@ -1,5 +1,5 @@
 # Symbol Map — ai-context-v6.5
-> Auto-generiert: 2026-07-07 14:05 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> Auto-generiert: 2026-07-09 22:04 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
 > 12 Dateien · 84 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `context_manager_agent.py`
@@ -84,14 +84,14 @@
   tryGit                              L64    
   analyze                             L85      — Heuristiken über hinzugefügte (`+`) Diff-Zeilen.
   push                                L88    
-  extractChangedFiles                 L135   
-  loadImpactGraph                     L143   
-  detectGaps                          L164     — Vergleicht geänderte Dateien gegen den Impact Graph und meld
-  loadInvariants                      L204     — Lädt invariants.yaml aus dem _ai_context-Ordner. Kein Fehler
-  flush                               L211   
-  checkInvariants                     L244     — Prüft ob geänderte Dateien Invarianten berühren und gibt War
-  readCommitIntent                    L276     — Liest den letzten Commit-Titel und speichert ihn als Intent 
-  text                                L292   
+  extractChangedFiles                 L138   
+  loadImpactGraph                     L146   
+  detectGaps                          L167     — Vergleicht geänderte Dateien gegen den Impact Graph und meld
+  loadInvariants                      L207     — Lädt invariants.yaml aus dem _ai_context-Ordner. Kein Fehler
+  flush                               L214   
+  checkInvariants                     L247     — Prüft ob geänderte Dateien Invarianten berühren und gibt War
+  readCommitIntent                    L279     — Liest den letzten Commit-Titel und speichert ihn als Intent 
+  text                                L295   
 ## `mcp/src/tools/memory_search.ts`
   formatHits                          L48    
 ## `mcp/src/tools/session_context.ts`

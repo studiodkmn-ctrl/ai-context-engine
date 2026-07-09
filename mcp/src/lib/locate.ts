@@ -221,6 +221,51 @@ function parseRegistry(contextDir: string): RegistryChunk[] {
   return chunks;
 }
 
+/**
+ * Fallback wenn registry.yaml (noch) nicht existiert — sie ist gitignored,
+ * ein frischer Clone / ein nie gescanntes Projekt hat also keine. Die
+ * Chunk-Anker in den Knowledge-.md-Dateien sind aber committet: direkt
+ * daraus Pseudo-Chunks bauen (ohne tags/seen/status — die kommen erst
+ * mit dem ersten `ai-context-registry.sh --scan`).
+ * Datei→Typ-Zuordnung identisch zur KNOWLEDGE_FILES-Liste im Registry-Scan.
+ */
+const KNOWLEDGE_FILES: Array<[string, string]> = [
+  ['_gotchas.md', 'gotcha'],
+  ['debug_patterns.md', 'debug'],
+  ['security.md', 'security'],
+  ['testing.md', 'rule'],
+  ['backend/auth.md', 'rule'],
+  ['backend/database.md', 'rule'],
+  ['backend/endpoints.md', 'endpoint'],
+  ['frontend/components.md', 'component'],
+  ['frontend/state.md', 'rule'],
+  ['frontend/routing.md', 'rule'],
+];
+
+function chunksFromMarkdownFallback(contextDir: string): RegistryChunk[] {
+  const chunks: RegistryChunk[] = [];
+  const anchorRe = /<!-- #(\w+) -->\n([\s\S]*?)<!-- \/\1 -->/g;
+  for (const [relFile, type] of KNOWLEDGE_FILES) {
+    let content: string;
+    try {
+      content = fs.readFileSync(path.join(contextDir, relFile), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const m of content.matchAll(anchorRe)) {
+      const id = m[1];
+      if (id.startsWith('_') || id.toLowerCase() === 'template') continue;
+      const pm = m[2].match(/\nP:\s*([123])/);
+      chunks.push({
+        id, type,
+        priority: pm ? parseInt(pm[1], 10) : 2,
+        file: relFile, tags: [], seen: '', code_touched: '', status: '',
+      });
+    }
+  }
+  return chunks;
+}
+
 function extractChunkBody(contextDir: string, file: string, id: string): string | null {
   const fp = path.join(contextDir, file);
   let content: string;
@@ -421,7 +466,12 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
   const interfaceHits = parseInterfaces(contextDir, qTokens).slice(0, 3);
 
   // ---- (d) Registry Chunks (Gotchas/Debug/Security/Rules) ----
-  const chunks = parseRegistry(contextDir);
+  // registry.yaml ist gitignored — frischer Clone / ungescanntes Projekt
+  // fällt auf direktes Anker-Parsing der Knowledge-.md-Dateien zurück.
+  let chunks = parseRegistry(contextDir);
+  if (chunks.length === 0) {
+    chunks = chunksFromMarkdownFallback(contextDir);
+  }
   const chunkHits = chunks
     .map(c => {
       const body = extractChunkBody(contextDir, c.file, c.id) || '';

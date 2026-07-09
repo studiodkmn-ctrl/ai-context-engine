@@ -1,4 +1,4 @@
-# Hot Paths — [PROJECT_NAME]
+# Hot Paths — ai-context-engine
 > Kritische Nicht-Offensichtliche Muster. 1× manuell schreiben, selten ändern.
 > Verhindert Re-Lesen stabiler Invarianten (~20% Token-Ersparnis pro Session).
 > Format: PATTERN_NAME (datei.ts:zeile) + Kurzbeschreibung + Entscheidungsbaum

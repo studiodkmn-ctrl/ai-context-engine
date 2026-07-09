@@ -137,6 +137,16 @@ if [ -d "$SRC_TEMPLATE/scripts/lib" ]; then
   echo -e "   ✅ scripts/lib/ (ctx.py, synonyms.txt)"
 fi
 
+# ctx.py erzeugt bei jedem Aufruf __pycache__/ — ohne .gitignore-Eintrag
+# landet das sonst versehentlich im nächsten Commit.
+if [ -f ".gitignore" ] && ! grep -q "__pycache__" ".gitignore" 2>/dev/null; then
+  printf '\n# Python bytecode cache (_ai_context/scripts/lib/ctx.py)\n__pycache__/\n*.pyc\n' >> ".gitignore"
+  echo -e "   ✅ .gitignore um __pycache__/ ergänzt"
+elif [ ! -f ".gitignore" ]; then
+  printf '__pycache__/\n*.pyc\n' > ".gitignore"
+  echo -e "   ✅ .gitignore angelegt (__pycache__/)"
+fi
+
 echo ""
 
 # =============================================================================

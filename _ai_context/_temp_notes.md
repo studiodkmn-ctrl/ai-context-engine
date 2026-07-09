@@ -81,3 +81,7 @@ Done this sprint:
 - Intent: fix(v7): require colon/paren after TODO markers in capture heuristic  (2026-07-09) <!-- hash:c10003beb83e -->
 
 - Intent: fix(v7): locate registry fallback, hook local-first, global install refresh  (2026-07-09) <!-- hash:dfaca3c9fdcd -->
+
+- Intent: fix(v7): migrate.sh installs core scripts on v5.x projects  (2026-07-09) <!-- hash:74f6e6e528d4 -->
+
+- Testfakt SMOKE-1783624453565: stdio MCP funktioniert  (2026-07-09) <!-- hash:b19b01877692 -->

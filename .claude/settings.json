@@ -1,5 +1,5 @@
 {
-  "_comment": "AI Context v6.0 \u2014 Auto-generated. SessionStart+UserPromptSubmit Hooks laufen in ALLEN Claude-Umgebungen (Terminal, VS Code, Cursor, JetBrains).",
+  "_comment": "AI Context v6.0 — Auto-generated. SessionStart+UserPromptSubmit Hooks laufen in ALLEN Claude-Umgebungen (Terminal, VS Code, Cursor, JetBrains).",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk '/^(\ud83e\udde0|\u2705|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/' || true"
+            "command": "[ -f _ai_context/scripts/ai-context-doctor.sh ] && bash _ai_context/scripts/ai-context-doctor.sh --session 2>&1 || true"
+          },
+          {
+            "type": "command",
+            "command": "[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk '/^(🧠|✅|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/' || true"
           },
           {
             "type": "command",

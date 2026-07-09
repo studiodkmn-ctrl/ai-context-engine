@@ -51,6 +51,7 @@ cp -r "$SCRIPT_DIR/hooks" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/setup_ai_context.sh" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/CLAUDE.md" "$INSTALL_DIR/"
 [ -f "$SCRIPT_DIR/migrate.sh" ] && cp "$SCRIPT_DIR/migrate.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/migrate.sh"
+[ -f "$SCRIPT_DIR/auto-update-all.sh" ] && cp "$SCRIPT_DIR/auto-update-all.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/auto-update-all.sh"
 [ -f "$SCRIPT_DIR/context_manager_agent.py" ] && cp "$SCRIPT_DIR/context_manager_agent.py" "$INSTALL_DIR/"
 [ -f "$SCRIPT_DIR/ai-anon.sh" ] && cp "$SCRIPT_DIR/ai-anon.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/ai-anon.sh"
 

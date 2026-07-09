@@ -1,79 +1,37 @@
-# CLAUDE.md — AI Context System
-> Lebt in `~/.claude/CLAUDE.md` oder `/projekt/CLAUDE.md`
-> Aktuelle Version: siehe `README.md`
+# CLAUDE.md — AI Context System v7
+> Lebt in `~/.claude/CLAUDE.md` oder `/projekt/CLAUDE.md`. Details: `README.md`.
 
 ## Sprache
-- Kommunikation: **Deutsch** | Code + Architektur: **Englisch**
+Kommunikation: **Deutsch** | Code + Architektur: **Englisch**
 
-## Session Start
-1. Lade `_ai_context/_SESSION.md` — enthält alles.
-2. Folge den Regeln darin.
+## Session-Kontext
+`_ai_context/_SESSION.md` wird per SessionStart-Hook automatisch injiziert —
+kein manueller Read nötig. Fehlt sie dennoch? `bash _ai_context/scripts/ai-session-prep.sh`.
 
-> Fehlt _SESSION.md? → `bash _ai_context/scripts/ai-session-prep.sh`
-
-## Gedächtnis zuerst (MCP)
+## Immer zuerst: locate()
 ```
-Bevor du Dateien liest, frage das Gedächtnis:
-  memory_search("<begriffe>")   → relevante Schnipsel, auch aus anderen Projekten
-  session_context()             → kompakter Projektkontext (statt 4 Dateien)
-Lies Dateien nur, wenn die Suche nichts liefert.
-Neue Erkenntnisse festhalten:
-  memory_save(content, type)    → type: gotcha|debug|security|decision|endpoint|auth|component|note
-capture_from_diff() läuft automatisch im post-commit-Hook — kein manuelles Lernen nötig.
-```
-> MCP-Server registriert in `.mcp.json`. Findet er nichts, fällt der Agent auf normales Dateilesen zurück.
-
-## Kontext-Routing
-```
-_ai_index.md (~150 Tok) → _idx/domain.md (~80 Tok) → datei.md (~200 Tok)
-Max 3 Dateien pro Kette. Max 4 Dateien pro Session.
-```
-
-## Kontext-Format (Code statt Prosa)
-```
-Gotchas/Rules/Patterns nutzen Code-Format:
-  → Beschreibung    ✗ FALSCH    ✓ RICHTIG
-  ? Symptom          @ Dateien   ⇒ Verweis (Pointer)
-
-⇒ = Pointer. Nicht kopieren, nur referenzieren.
-  Beispiel: auth: ⇒ security.md#auth_first
-  Claude lädt die referenzierte Datei nur bei Bedarf.
+Bei wo/warum/fix-Fragen: ZUERST MCP-Tool locate("<beschreibung>") aufrufen.
+Fächert über Interaction Map, Symbol Map, Interfaces, Gotchas/Debug-Patterns
+(mit Frische-Status), Invarianten, Impact-Graph — ein Lookup statt vieler Reads.
+Kein MCP verfügbar? Fallback: bash _ai_context/scripts/ai-symptom-router.sh "<beschreibung>"
+Kein Treffer → normal grep/Read.
 ```
 
 ## Writeback
 ```
-Gotcha         → _gotchas.md (Code-Format, max 15, P: 1/2/3)
-Debug Pattern  → debug_patterns.md (Code-Format, max 15, P: 1/2/3)
-Endpoint       → backend/endpoints.md
-Auth           → backend/auth.md
-Komponente     → frontend/components.md
-Architektur    → decisions.md
-Sprint         → _temp_notes.md (max 5 Recent Changes)
-Security       → security.md (Code-Format, max 10, P: 1/2/3)
-```
-Immer: Domain-Index Status aktualisieren. Pointer (⇒) statt Inhalt kopieren.
-
-## Writeback-Protokoll (v5.2 Dedup-Check)
-```
-VOR jedem neuen Eintrag in _gotchas.md / debug_patterns.md / security.md:
-  bash _ai_context/check_context_hash.sh --dedup _ai_context/_gotchas.md
-  → DUPLICATE:id  → Update existierenden Eintrag statt neu anlegen
-  → NEW           → Neuen Eintrag hinzufügen
-
-Priorität setzen:
-  P: 1 = kritisch (niemals löschen, immer inline in SESSION.md)
-  P: 2 = wichtig  (default — bei Overflow: neueste bleiben)
-  P: 3 = nice-to-know (bei Overflow: zuerst → _gotchas_archive.md)
-
-Konflikte prüfen nach Writeback:
-  bash _ai_context/check_context_hash.sh --conflicts
+Ziel-Datei per Schublade bestimmen: siehe _ai_context/drawers.yaml
+(ui_controls/api/auth/data/state/infra → jeweilige index:-Datei).
+Vor neuem Eintrag: bash _ai_context/check_context_hash.sh --dedup <datei>
+  → DUPLICATE:id → bestehenden Eintrag updaten statt neu anlegen
+Code-Format (→ ✗ ✓ ? @ ⇒), P: 1=kritisch 2=wichtig 3=nice-to-know,
+optional seen: YYYY-MM-DD (Frische — siehe _gotchas.md#legende).
+Overflow (Archivierung/Split) läuft automatisch via post-commit Hook.
 ```
 
-## Schubladen (v5.2 Overflow-Management)
+## Gedächtnis (MCP, ergänzend zu locate)
 ```
-Automatisch via post-commit Hook:
-  P3-Gotchas > 5     → _gotchas_archive.md (auto-erstellt)
-  Domain-Datei >80Z  → _core.md + _extended.md (auto-split)
-
-Manuell: bash _ai_context/scripts/ai-context-drawer.sh
+memory_search("<begriffe>")  → Schnipsel, auch aus anderen Projekten
+session_context()            → kompakter Projektkontext
+memory_save(content, type)   → type: gotcha|debug|security|decision|endpoint|auth|component|note
+capture_from_diff() läuft automatisch im post-commit-Hook.
 ```

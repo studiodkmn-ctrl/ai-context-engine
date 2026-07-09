@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# migrate.sh — Additive Migration: AI Context v5.x → v6.5
+# migrate.sh — Additive Migration: AI Context v5.x/v6.x → v7.0
 #
 # Aufruf aus dem Root des Ziel-Projekts:
-#   bash /path/to/ai-context-v5.2/migrate.sh
+#   bash /path/to/ai-context-v7/migrate.sh
 #   bash ~/.ai-context/migrate.sh
 #
 # Was passiert:
@@ -13,6 +13,9 @@
 #   4. .claude/settings.json mergen (Doctor --session als erster Hook)
 #   5. _interaction_map.md Placeholder anlegen (falls fehlt)
 #   6. ai-context-doctor.sh --check ausführen
+#   9. v7: scripts/lib/ (ctx.py, synonyms.txt), drawers.yaml,
+#      seen-Felder nachtragen (Registry-Scan), SessionStart-Hook für
+#      _SESSION.md-Injektion
 #
 # Was NICHT angefasst wird:
 #   _gotchas.md, debug_patterns.md, security.md, _quick_facts.md,
@@ -27,7 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_TEMPLATE="$SCRIPT_DIR/_ai_context_template"
 
 echo ""
-echo -e "${BOLD}🔄 AI Context — Migration → v6.5${NC}"
+echo -e "${BOLD}🔄 AI Context — Migration → v7.0${NC}"
 echo ""
 
 # =============================================================================
@@ -57,9 +60,9 @@ fi
 
 # Version anzeigen
 if [ -f "VERSION" ]; then
-  echo -e "   Projekt-Version: ${YELLOW}$(cat VERSION)${NC} → ${GREEN}6.5${NC}"
+  echo -e "   Projekt-Version: ${YELLOW}$(cat VERSION)${NC} → ${GREEN}7.0.0${NC}"
 else
-  echo -e "   AI Context v5.x erkannt → ${GREEN}v6.5${NC}"
+  echo -e "   AI Context v5.x/v6.x erkannt → ${GREEN}v7.0.0${NC}"
 fi
 echo ""
 
@@ -76,6 +79,10 @@ NEW_SCRIPTS=(
   "ai-impact-learn.sh"
   "ai-symptom-router.sh"
   "ai-verify.sh"
+  "ai-symbol-map.sh"
+  "ai-interface-snapshot.sh"
+  "ai-when-broke.sh"
+  "ai-invariant-check.sh"
 )
 
 for script in "${NEW_SCRIPTS[@]}"; do
@@ -90,12 +97,15 @@ for script in "${NEW_SCRIPTS[@]}"; do
   fi
 done
 
-# Modifizierte Scripts aktualisieren (v6.5 bringt neue Sektionen)
+# Modifizierte Scripts aktualisieren (v6.5/v7 bringen neue Sektionen)
 UPDATED_SCRIPTS=(
   "ai-session-prep.sh"
   "ai-context-registry.sh"
   "ai-context-sync.sh"
   "ai-context-drawer.sh"
+  "ai-context-doctor.sh"
+  "ai-context-map.sh"
+  "ai-symptom-router.sh"
 )
 
 for script in "${UPDATED_SCRIPTS[@]}"; do
@@ -113,6 +123,14 @@ if [ -f "$SRC_TEMPLATE/check_context_hash.sh" ] && [ -f "_ai_context/check_conte
   cp "$SRC_TEMPLATE/check_context_hash.sh" "_ai_context/check_context_hash.sh"
   chmod +x "_ai_context/check_context_hash.sh"
   echo -e "   🔄 check_context_hash.sh (aktualisiert)"
+fi
+
+# v7: scripts/lib/ (ctx.py, synonyms.txt) — von ai-context-registry.sh,
+# ai-session-prep.sh, ai-context-doctor.sh, ai-symptom-router.sh benötigt.
+if [ -d "$SRC_TEMPLATE/scripts/lib" ]; then
+  mkdir -p "_ai_context/scripts/lib"
+  cp -r "$SRC_TEMPLATE/scripts/lib/." "_ai_context/scripts/lib/"
+  echo -e "   ✅ scripts/lib/ (ctx.py, synonyms.txt)"
 fi
 
 echo ""
@@ -196,18 +214,20 @@ echo -e "${CYAN}⚙️  .claude/settings.json mergen...${NC}"
 SETTINGS=".claude/settings.json"
 DOCTOR_CMD="[ -f _ai_context/scripts/ai-context-doctor.sh ] && bash _ai_context/scripts/ai-context-doctor.sh --session 2>&1 || true"
 SESSION_CMD="[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk '/^(🧠|✅|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/' || true"
+CAT_SESSION_CMD="cat _ai_context/_SESSION.md 2>/dev/null || true"
 PII_CMD="if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hooks/pii-warn.sh; fi"
 
 mkdir -p ".claude"
 
 if command -v python3 &>/dev/null; then
-  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" << 'PYEOF'
+  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" << 'PYEOF'
 import json, sys, pathlib
 
 path      = pathlib.Path(sys.argv[1])
 doctor_cmd  = sys.argv[2]
 session_cmd = sys.argv[3]
 pii_cmd     = sys.argv[4]
+cat_session_cmd = sys.argv[5]
 
 if path.exists():
     try:
@@ -246,6 +266,23 @@ elif not has_doctor:
 else:
     print("   ✅ SessionStart: doctor --session bereits vorhanden")
 
+# ---- v7: _SESSION.md direkt injizieren (statt nur Statuszeile) ----
+has_cat_session = any(
+    any("_SESSION.md" in h.get("command", "") for h in g.get("hooks", []))
+    for g in groups
+)
+if not has_cat_session:
+    target = groups[0] if groups else {"matcher": "", "hooks": []}
+    target.setdefault("hooks", []).append({"type": "command", "command": cat_session_cmd})
+    if not groups:
+        groups.insert(0, target)
+    else:
+        groups[0] = target
+    changed = True
+    print("   ✅ SessionStart: _SESSION.md-Injektion hinzugefügt")
+else:
+    print("   ✅ SessionStart: _SESSION.md-Injektion bereits vorhanden")
+
 # ---- UserPromptSubmit ----
 pii_groups = hooks.setdefault("UserPromptSubmit", [])
 has_pii    = any(any("pii-warn" in h.get("command","") for h in g.get("hooks",[])) for g in pii_groups)
@@ -281,13 +318,106 @@ if [ ! -f "_ai_context/_interaction_map.md" ]; then
 fi
 
 # =============================================================================
-# 7. Health-Check
+# 7. v6.6 — hot_paths.md + Fokus-Sektion + Symbol-Map generieren
+# =============================================================================
+
+echo -e "${CYAN}🔥 v6.6: hot_paths.md + Symbol-Map + Interface-Snapshot...${NC}"
+
+# hot_paths.md anlegen (nur wenn noch nicht vorhanden — ist manuell)
+if [ ! -f "_ai_context/hot_paths.md" ] && [ -f "$SRC_TEMPLATE/hot_paths.md" ]; then
+  PROJECT_NAME="$(basename "$(pwd)")"
+  sed "s/\[PROJECT_NAME\]/$PROJECT_NAME/g" "$SRC_TEMPLATE/hot_paths.md" > "_ai_context/hot_paths.md"
+  echo -e "   ${GREEN}✅ _ai_context/hot_paths.md${NC} angelegt (manuell befüllen)"
+else
+  echo -e "   ✅ hot_paths.md bereits vorhanden"
+fi
+
+# _ai_index.md Fokus-Sektion einfügen wenn noch nicht vorhanden
+if [ -f "_ai_context/_ai_index.md" ] && ! grep -q "Aktueller Fokus" "_ai_context/_ai_index.md"; then
+  python3 - "_ai_context/_ai_index.md" << 'PYEOF' || true
+import sys, pathlib, re
+
+idx_path = pathlib.Path(sys.argv[1])
+content = idx_path.read_text(encoding='utf-8')
+
+fokus_block = """## ⚡ Aktueller Fokus
+```
+Fokus:          [Was gerade aktiv entwickelt wird]
+Seit:           [DATE]
+Letzter Commit: [Kurzbeschreibung]
+Nächstes:       [Was als nächstes ansteht]
+```
+> REGEL: Diesen Block bei jedem Commit aktuell halten — verhindert 10-Minuten-Orientierungsphase.
+
+"""
+
+target = re.search(r'^## (Projekt|Übersicht|Overview)', content, re.MULTILINE)
+if target:
+    pos = target.start()
+    content = content[:pos] + fokus_block + content[pos:]
+else:
+    m = re.search(r'^>.*\n', content, re.MULTILINE)
+    pos = m.end() if m else 0
+    content = content[:pos] + '\n' + fokus_block + content[pos:]
+
+idx_path.write_text(content, encoding='utf-8')
+PYEOF
+  echo -e "   ${GREEN}✅ _ai_index.md${NC} Fokus-Sektion hinzugefügt"
+fi
+
+# _idx/ Verzeichnis anlegen
+mkdir -p "_ai_context/_idx"
+
+# Symbol-Map + Interface-Snapshot generieren
+if [ -f "_ai_context/scripts/ai-symbol-map.sh" ]; then
+  bash "_ai_context/scripts/ai-symbol-map.sh" 2>/dev/null || true
+fi
+if [ -f "_ai_context/scripts/ai-interface-snapshot.sh" ]; then
+  bash "_ai_context/scripts/ai-interface-snapshot.sh" 2>/dev/null || true
+fi
+
+echo ""
+
+# =============================================================================
+# 9. v7 — drawers.yaml + Frische-Felder (seen/code_touched/status)
+# =============================================================================
+
+echo -e "${CYAN}🗂️  v7: drawers.yaml + Frische-Modell...${NC}"
+
+# drawers.yaml: generische Next.js-Default-Globs (kein Stack-Autodetect wie in
+# setup_ai_context.sh — bei Bedarf manuell an die echte Projektstruktur anpassen).
+if [ ! -f "_ai_context/drawers.yaml" ] && [ -f "$SRC_TEMPLATE/drawers.yaml" ]; then
+  cp "$SRC_TEMPLATE/drawers.yaml" "_ai_context/drawers.yaml"
+  echo -e "   ${GREEN}✅ _ai_context/drawers.yaml${NC} angelegt (generische Globs — ggf. anpassen)"
+else
+  echo -e "   ✅ drawers.yaml bereits vorhanden"
+fi
+
+# Interaction Map einmalig scannen, falls noch nie befüllt
+if [ -f "_ai_context/_interaction_map.md" ] && grep -q "leer bis zum ersten Scan" "_ai_context/_interaction_map.md" 2>/dev/null; then
+  if [ -f "_ai_context/scripts/ai-context-map.sh" ]; then
+    bash "_ai_context/scripts/ai-context-map.sh" 2>/dev/null || true
+  fi
+fi
+
+# Registry neu scannen: trägt seen/code_touched/status für alle Chunks nach
+# (bestehende Chunks ohne seen: → seen = bisheriges updated-Datum, additiv).
+if [ -f "_ai_context/scripts/ai-context-registry.sh" ]; then
+  bash "_ai_context/scripts/ai-context-registry.sh" --scan 2>/dev/null || true
+  echo -e "   ${GREEN}✅ registry.yaml${NC} neu gescannt (seen/code_touched/status)"
+fi
+
+echo ""
+
+# =============================================================================
+# 8. Health-Check
 # =============================================================================
 
 echo -e "${CYAN}🩺 Health-Check (ai-context-doctor --check)...${NC}"
 echo ""
 
 DOCTOR="_ai_context/scripts/ai-context-doctor.sh"
+
 if [ -f "$DOCTOR" ]; then
   bash "$DOCTOR" --check || true
 else
@@ -301,7 +431,7 @@ echo ""
 # =============================================================================
 
 echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}${BOLD}║  ✅  Migration → AI Context v6.5 fertig  ║${NC}"
+echo -e "${GREEN}${BOLD}║  ✅  Migration → AI Context v7.0.0 fertig  ║${NC}"
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BOLD}Neue Befehle in Claude Code:${NC}"

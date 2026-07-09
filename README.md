@@ -151,7 +151,52 @@ When files change together repeatedly, the graph learns and warns.
 memory_search("auth bug")     → finds relevant gotchas cross-project
 session_context()             → compact context instead of 4+ files  
 capture_from_diff()           → learns from every commit automatically
+locate("login button broken") → single lookup across ALL of the above (v7)
 ```
+
+### 6. `locate()` — one lookup instead of six files (v7)
+
+The single entry point that fans out over Interaction Map, Symbol Map,
+Interfaces, Gotchas/Debug-Patterns, Invariants and the Impact Graph —
+so the agent doesn't need to know which of the six index files to check.
+
+```
+locate("login button reagiert nicht")
+→
+🔘 button `LoginButton`  src/components/LoginForm.tsx:47
+   handler: handleLogin  |  state: -  |  endpoint: POST /api/auth/login
+
+⚡ Verwandte Gotchas/Patterns:
+   auth_version [P2] — ⚠ PRÜFEN (Code neuer als seen 2026-04-14)
+
+🔒 Invariante:
+   auth_first (hard) — Auth-Check muss vor jeder state-ändernden Route stehen
+
+🕸 Impact: src/lib/auth.ts ändert sich oft mit middleware.ts, login.tsx
+```
+
+Available both as the `locate` MCP tool and as a CLI
+(`bash _ai_context/scripts/ai-symptom-router.sh "<description>"`, which
+delegates to `locate()` under the hood and falls back to its own
+keyword router if the MCP build isn't available).
+
+### 7. `drawers.yaml` — content-based routing manifest (v7)
+
+Instead of four fixed domains, a declarative manifest maps glob patterns
+and keywords to an index file per "drawer" (`ui_controls`, `api`, `auth`,
+`data`, `state`, `infra` by default — extend with your own, e.g.
+`payments`). `setup_ai_context.sh` generates one from the detected stack;
+`locate()` uses it to route a query to the right index first.
+
+### 8. Freshness model — is this gotcha still true? (v7)
+
+Every registry chunk gets `seen` (when it was last confirmed) and
+`code_touched` (the newest git-log date across its `@`-referenced files,
+computed automatically). The derived `status` — `fresh` / `check`
+(code changed after `seen`) / `orphan` (the file is gone) — shows up
+directly in `locate()`'s answer card and in `ai-context-doctor.sh`'s
+`freshness` check, so the agent can tell a still-valid gotcha from one
+that predates a later refactor.
 
 ---
 
@@ -214,6 +259,7 @@ bash _ai_context/scripts/ai-context-doctor.sh
 ## MCP Tools (in Claude Code)
 
 ```
+locate("login button broken")    # single lookup — try this first
 capture_from_diff(apply=true)    # auto-learn from current commit
 memory_search("jwt expiry")      # search across all your projects  
 session_context()                # load compact project context
@@ -263,6 +309,9 @@ Claude says:
 - [x] Intent Tagging — commit meaning extracted + stored
 - [x] MCP Server — Claude Code / Cursor integration
 - [x] Cross-project memory — learnings transfer between projects
+- [x] `locate()` — single-lookup routing across all indices (v7)
+- [x] `drawers.yaml` — declarative content-based routing manifest (v7)
+- [x] Freshness model — `seen`/`code_touched`/`status` per chunk, derived from git history (v7)
 - [ ] Invariant discovery — auto-suggest invariants from bug history
 - [ ] Static verification — verify invariants are enforced in code
 - [ ] System Behavior Model — goal-state layer above invariants

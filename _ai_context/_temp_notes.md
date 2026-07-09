@@ -67,3 +67,7 @@ Done this sprint:
 - Testfakt SMOKE-1783422265977: stdio MCP funktioniert  (2026-07-07) <!-- hash:c75792a15827 -->
 
 - Intent: feat(v7-phase5): wire up interaction map + fix concise-arrow endpoint gap  (2026-07-07) <!-- hash:023603f256ef -->
+
+- Intent: feat(v7-phase6): session-start entschlacken  (2026-07-09) <!-- hash:6a37e0c4ed35 -->
+
+- Testfakt SMOKE-1783622207717: stdio MCP funktioniert  (2026-07-09) <!-- hash:14e5387e7703 -->

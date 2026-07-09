@@ -8,6 +8,10 @@
           {
             "type": "command",
             "command": "[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk '/^(\ud83e\udde0|\u2705|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/' || true"
+          },
+          {
+            "type": "command",
+            "command": "cat _ai_context/_SESSION.md 2>/dev/null || true"
           }
         ]
       }

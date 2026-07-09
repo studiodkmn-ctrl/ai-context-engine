@@ -65,3 +65,5 @@ Done this sprint:
 - Intent: feat(v7-phase4): locate() MCP tool — single lookup for all drawers  (2026-07-07) <!-- hash:d5441cb95373 -->
 
 - Testfakt SMOKE-1783422265977: stdio MCP funktioniert  (2026-07-07) <!-- hash:c75792a15827 -->
+
+- Intent: feat(v7-phase5): wire up interaction map + fix concise-arrow endpoint gap  (2026-07-07) <!-- hash:023603f256ef -->

@@ -53,11 +53,6 @@ else
   TOKEN_BUDGET_HARD=99999
 fi
 
-# ---- Inkrementeller Cache ----
-CACHE_DIR="$CONTEXT_DIR/_cache"
-CACHE_SECTIONS="$CACHE_DIR/sections"
-mkdir -p "$CACHE_SECTIONS" 2>/dev/null || true
-
 # Parse args
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -184,32 +179,6 @@ count_tokens() {
 count_tokens_str() {
   local content="$1"
   printf '%s' "$content" | python3 "$LIB_DIR/ctx.py" count_tokens
-}
-
-# ---- Inkrementeller Cache ----
-# Prüft ob der Cache für eine Sektion noch gültig ist (mtime-basiert)
-is_cache_valid() {
-  local section="$1"
-  local source_file="$2"
-  local cache_file="$CACHE_SECTIONS/${section}.cache"
-  [ ! -f "$cache_file" ] && echo "false" && return
-  [ ! -f "$source_file" ] && echo "false" && return
-  $FORCE_REGEN && echo "false" && return
-  local src_sig
-  src_sig="$(stat -f '%m-%z' "$source_file" 2>/dev/null || stat -c '%Y-%s' "$source_file" 2>/dev/null || echo 'unknown')"
-  local cached_sig
-  cached_sig=$(head -1 "$cache_file" 2>/dev/null | sed 's/^#SIG://')
-  [ "$src_sig" = "$cached_sig" ] && echo "true" || echo "false"
-}
-
-write_cache() {
-  local section="$1"
-  local source_file="$2"
-  local content="$3"
-  local cache_file="$CACHE_SECTIONS/${section}.cache"
-  local src_sig
-  src_sig="$(stat -f '%m-%z' "$source_file" 2>/dev/null || stat -c '%Y-%s' "$source_file" 2>/dev/null || echo 'unknown')"
-  printf '#SIG:%s\n%s' "$src_sig" "$content" > "$cache_file" 2>/dev/null || true
 }
 
 # ---- Phase A: HANDOFF Signal Propagation ----
@@ -398,22 +367,16 @@ TOTAL_TOKENS=0
 
 Diese Regeln überschreiben das Default-Verhalten und müssen strikt angewendet werden:
 
-1. **Bei Fehlerberichten / Stack-Traces / Bug-Meldungen**:
-   BEVOR du antwortest, scanne `_gotchas.md` und `debug_patterns.md` nach einer passenden ID.
-   Bei Match antworte zuerst mit: `Bekannter Fehler gefunden (Priorität: P{N}): {ID}`
-   Dann zeige den Fix. Bei mehreren betroffenen Dateien biete Auto-Fix für alle an.
-   Bei UI-/Button-/Navigation-Bugs zusätzlich: lies `_interaction_map.md` und
-   verfolge das betroffene Element → Datei:Zeile → Handler → State → Endpoint,
-   BEVOR du die Codebase durchsuchst.
+1. **Bei wo/warum/fix-Fragen** (Bug-Meldungen, Stack-Traces, "wo ist Funktion X",
+   "welche Felder hat Typ Y", Code-Aufgaben wie Route/Komponente/Schema erstellen):
+   ZUERST das MCP-Tool `locate(<beschreibung>)` aufrufen — es fächert über
+   Interaction Map, Symbol Map, Interfaces, Gotchas/Debug-Patterns (mit
+   Frische-Status), Invarianten und Impact-Graph in einem Lookup.
+   Nur wenn `locate` keinen Treffer liefert: grep/Read wie gewohnt.
+   Kein MCP verfügbar? Fallback: `bash _ai_context/scripts/ai-symptom-router.sh "<beschreibung>"`.
+   Danach normal mit dem Ergebnis weiterarbeiten (Fix zeigen, Code erstellen, ...).
 
-2. **Bei Code-Aufgaben** (Route/Komponente/Schema erstellen):
-   BEVOR du eine Quelldatei komplett liest:
-   a) Suche in `_idx/symbols.md` nach Funktionsname → springe direkt zu Datei:Zeile
-   b) Suche in `_idx/interfaces.md` nach Interface-/Type-Namen → Felder sofort bekannt
-   c) Lies nur die betroffene Stelle, nicht die ganze Datei
-   Sage dann explizit welche Kontextdateien du liest und erstelle Code mit Projektregeln.
-
-3. **Bei Sprint-/Status-Fragen** ("Was haben wir diese Woche gemacht?"):
+2. **Bei Sprint-/Status-Fragen** ("Was haben wir diese Woche gemacht?"):
    Lade `_temp_notes.md` + `git log --since='7 days ago' --oneline`.
    Zeige im Format:
    ```
@@ -422,12 +385,12 @@ Diese Regeln überschreiben das Default-Verhalten und müssen strikt angewendet 
    📋 Offen:         <bullet list>
    ```
 
-4. **Projektregeln sind verbindlich**: Auth-Check, Prisma-Singleton, etc. aus Quick Facts
+3. **Projektregeln sind verbindlich**: Auth-Check, Prisma-Singleton, etc. aus Quick Facts
    wendest du bei neuem Code automatisch an — kein Disclaimer, keine Nachfrage nötig.
 
-5. **Sprachregel**: Kommunikation Deutsch, Code & Identifier Englisch.
+4. **Sprachregel**: Kommunikation Deutsch, Code & Identifier Englisch.
 
-6. **Session-Übergabe** (HANDOFF.md):
+5. **Session-Übergabe** (HANDOFF.md):
    → Bei Session-Start: Falls HANDOFF-Sektion unten "Status: in_progress" zeigt,
      LIES sie zuerst und setze die Arbeit dort fort.
    → Bei Session-Ende: Wenn Aufgabe NICHT fertig ist, schreibe Zustand
@@ -623,10 +586,14 @@ EOF
     for idx_file in "$IDX_DIR"/*.md; do
       [ ! -f "$idx_file" ] && continue
       domain=$(basename "$idx_file" .md)
+      # symbols.md/interfaces.md sind keine Domain-Router-Tabellen, sondern
+      # die Navigations-Indizes aus Section 0.6 (dort schon inline) — überspringen.
+      case "$domain" in symbols|interfaces) continue ;; esac
       echo ""
       echo "#### $domain"
-      # Just show the table, not the header
-      grep '^|' "$idx_file" 2>/dev/null
+      # Just show the table, not the header — grep findet ggf. nichts (leere
+      # Domain-Datei), das ist kein Fehler, daher || true statt set -e-Abbruch.
+      grep '^|' "$idx_file" 2>/dev/null || true
       echo ""
     done
   fi
@@ -680,9 +647,9 @@ EOF
     echo ""
   fi
 
-  # Section 5: Gotchas (v6.0 registry-aware ODER v5.2 Fallback)
-  # v6.0: Nur P1-Chunks + task-relevante Chunks inline; Rest als Pointer-Zeilen
-  # v5.2: Alle Chunks aus _gotchas.md laden (wenn kein registry.yaml vorhanden)
+  # Section 5: Gotchas (v6.0+ registry-aware — Registry ist seit v7 Pflicht,
+  # setup_ai_context.sh baut sie immer; kein Rohtext-Fallback mehr nötig)
+  # Nur P1-Chunks + task-relevante Chunks inline; Rest als Pointer-Zeilen
   REGISTRY_FILE="$CONTEXT_DIR/registry.yaml"
   REGISTRY_TOOL="$(dirname "${BASH_SOURCE[0]}")/ai-context-registry.sh"
 
@@ -821,36 +788,6 @@ PYEOF
         echo ""
         echo "$GOTCHA_OUT"
         T=$(count_tokens_str "$GOTCHA_OUT")
-        TOTAL_TOKENS=$((TOTAL_TOKENS + T))
-      fi
-
-    elif [ -f "$GOTCHAS_FILE" ]; then
-      # ---- v5.2 Fallback: Original-Code (unverändert) ----
-      GOTCHA_COUNT=$(python3 -c "
-import re, pathlib
-c = pathlib.Path('$GOTCHAS_FILE').read_text(encoding='utf-8')
-print(len(re.findall(r'\`\`\`\s*\n(?:ID:|RULE:)', c)))
-" 2>/dev/null || grep -cE "^(### )?ID:" "$GOTCHAS_FILE" 2>/dev/null || echo "0")
-      GOTCHA_COUNT="${GOTCHA_COUNT//[^0-9]/}"
-      GOTCHA_COUNT=${GOTCHA_COUNT:-0}
-      if [ "$GOTCHA_COUNT" -gt 0 ]; then
-        echo "---"
-        echo ""
-        echo "## ⚡ Gotchas (${GOTCHA_COUNT} aktiv)"
-        echo ""
-        if [ "$(is_cache_valid "gotchas" "$GOTCHAS_FILE")" = "true" ]; then
-          tail -n +2 "$CACHE_SECTIONS/gotchas.cache" 2>/dev/null
-        else
-          if grep -q "## Aktiv" "$GOTCHAS_FILE" 2>/dev/null; then
-            SECTION_CONTENT=$(sed -n '/^## Aktiv/,/^## Legende/p' "$GOTCHAS_FILE" | sed '$d')
-          else
-            SECTION_CONTENT=$(sed -n '/^### ID:/,$ p' "$GOTCHAS_FILE")
-          fi
-          echo "$SECTION_CONTENT"
-          write_cache "gotchas" "$GOTCHAS_FILE" "$SECTION_CONTENT"
-        fi
-        echo ""
-        T=$(count_tokens "$GOTCHAS_FILE")
         TOTAL_TOKENS=$((TOTAL_TOKENS + T))
       fi
     fi

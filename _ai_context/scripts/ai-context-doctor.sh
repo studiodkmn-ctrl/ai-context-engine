@@ -428,6 +428,35 @@ run_checks() {
       echo "CHECK|scriptdrift|PASS|NONE|Scripts ↔ Template synchron" >> "$REPORT"
     fi
   fi
+
+  # Check 10 (v7): lokaler Template-Drift — NUR relevant für dieses
+  # Repo selbst (ai-context-engine), wo _ai_context_template/ neben
+  # _ai_context/ liegt. Andere Prüfrichtung als scriptdrift oben (das
+  # vergleicht gegen das GLOBALE ~/.ai-context/_ai_context_template,
+  # hier geht es um Drift zwischen den zwei Kopien IM SELBEN Repo).
+  local local_tmpl_scripts="$PROJECT_DIR/_ai_context_template/scripts"
+  if [ -d "$local_tmpl_scripts" ] && [ -d "$SCRIPT_DIR" ] && [ "$local_tmpl_scripts" != "$SCRIPT_DIR" ]; then
+    local ldrifted=()
+    local lf lbase ltmpl
+    for lf in "$SCRIPT_DIR"/*.sh; do
+      [ -f "$lf" ] || continue
+      lbase="$(basename "$lf")"
+      ltmpl="$local_tmpl_scripts/$lbase"
+      [ -f "$ltmpl" ] || continue
+      if [ "$(portable_hash "$lf")" != "$(portable_hash "$ltmpl")" ]; then
+        ldrifted+=("$lbase")
+      fi
+    done
+    if [ ${#ldrifted[@]} -gt 0 ]; then
+      echo "CHECK|localtemplatedrift|WARN|CLAUDE|${#ldrifted[@]} Script(s) weichen vom repo-lokalen _ai_context_template ab" >> "$REPORT"
+      local ld
+      for ld in "${ldrifted[@]}"; do
+        echo "DETAIL|localtemplatedrift|$ld — sync via: cp $local_tmpl_scripts/$ld $SCRIPT_DIR/$ld" >> "$REPORT"
+      done
+    else
+      echo "CHECK|localtemplatedrift|PASS|NONE|_ai_context/scripts ↔ _ai_context_template/scripts synchron" >> "$REPORT"
+    fi
+  fi
 }
 
 # ---- mechanische Fixes ----

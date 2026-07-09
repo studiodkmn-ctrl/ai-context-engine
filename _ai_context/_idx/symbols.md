@@ -1,5 +1,5 @@
 # Symbol Map — ai-context-v6.5
-> Auto-generiert: 2026-07-07 14:00 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> Auto-generiert: 2026-07-07 14:05 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
 > 12 Dateien · 84 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `context_manager_agent.py`
@@ -55,7 +55,7 @@
   parseImpactGraph                    L371     — ------------------------------------------------------------
   locateQuery                         L401   
   boost                               L436     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
-  addFile                             L546   
+  addFile                             L548   
 ## `mcp/src/lib/paths.ts`
   findProjectRoot                     L9     
   localContextDir                     L23      — Pfad zum projektlokalen `_ai_context`-Ordner.

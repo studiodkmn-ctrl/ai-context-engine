@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ai-context-drawer.sh — Automatisches Schubladen-System (v5.2)
+# ai-context-drawer.sh — Automatisches Schubladen-System (v5.2, v7: drawers.yaml-generalisiert)
 #
 # Überwacht Overflow-Bedingungen und erstellt Schubladen autonom:
 #   - _gotchas.md P3-Einträge > 5 → verschiebt in _gotchas_archive.md

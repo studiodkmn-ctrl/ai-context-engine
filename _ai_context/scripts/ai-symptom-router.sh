@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ai-symptom-router.sh — Symptom-Router (v6.5 — Phase 2)
+# ai-symptom-router.sh — Symptom-Router (v6.5 — Phase 2, v7: locate()-Wrapper)
 #
 # Nimmt eine Bug-Beschreibung und findet die wahrscheinlichste Ursache, OHNE
 # die Codebase zu durchsuchen. Matcht gegen:

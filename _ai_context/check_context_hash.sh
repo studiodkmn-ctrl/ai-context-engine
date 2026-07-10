@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# check_context_hash.sh — Hash-based Change Detection (v5.2)
+# check_context_hash.sh — Hash-based Change Detection (v5.2, v7: STOPWORDS via ctx.py)
 # Detects file changes that happen OUTSIDE git (npm install, AI edits, codegen)
 #
 # Usage:

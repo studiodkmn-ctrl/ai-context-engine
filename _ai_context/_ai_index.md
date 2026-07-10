@@ -13,7 +13,7 @@ Nächstes:       [Was als nächstes ansteht]
 ```
 Stack:    Test
 Phase:    Beta
-Git:      ba2827b3d555e8ae421316c6b48a102816609ce7
+Git:      2f17ef6dd76152e19e1f0bf1d511c20576f6624d
 Session:  2026-07-10
 ```
 

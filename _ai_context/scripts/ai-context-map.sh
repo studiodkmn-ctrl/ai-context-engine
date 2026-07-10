@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ai-context-map.sh — Interaction Map Generator (v6.5 — Phase 1)
+# ai-context-map.sh — Interaction Map Generator (v6.5 — Phase 1, v7: verdrahtet + concise-arrow Fix)
 #
 # Scannt interaktive UI-Elemente (Buttons, Links, Forms) und baut eine
 # Ein-Hop-Trace-Tabelle:

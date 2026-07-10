@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ai-context-doctor.sh — Selbst-Reparatur des Kontext-Systems (v6.5 — Phase 4)
+# ai-context-doctor.sh — Selbst-Reparatur des Kontext-Systems (v6.5 — Phase 4, v7: Freshness + localtemplatedrift)
 #
 # Erkennt Defekte in _ai_context/ und repariert mechanische selbst.
 # Orchestriert bestehende Tools (check_context_hash.sh, ai-context-registry.sh),

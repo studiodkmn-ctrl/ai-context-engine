@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ai-session-prep.sh — Zero-Step Startup Engine (v5.1)
+# ai-session-prep.sh — Zero-Step Startup Engine (v5.1, v7: locate()-Regel + ctx.py)
 #
 # NEU in v5.1:
 #   - Zweistufiger Index: Micro-Index + Domain-Index

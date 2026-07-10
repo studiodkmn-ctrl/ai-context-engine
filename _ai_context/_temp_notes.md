@@ -87,3 +87,5 @@ Done this sprint:
 - Testfakt SMOKE-1783624453565: stdio MCP funktioniert  (2026-07-09) <!-- hash:b19b01877692 -->
 
 - Intent: feat(v7): roll out to all registered projects, close remaining gaps  (2026-07-09) <!-- hash:91d766f6ff0a -->
+
+- Testfakt SMOKE-1783642024558: stdio MCP funktioniert  (2026-07-10) <!-- hash:f0afa93ad961 -->

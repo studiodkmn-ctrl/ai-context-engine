@@ -85,3 +85,5 @@ Done this sprint:
 - Intent: fix(v7): migrate.sh installs core scripts on v5.x projects  (2026-07-09) <!-- hash:74f6e6e528d4 -->
 
 - Testfakt SMOKE-1783624453565: stdio MCP funktioniert  (2026-07-09) <!-- hash:b19b01877692 -->
+
+- Intent: feat(v7): roll out to all registered projects, close remaining gaps  (2026-07-09) <!-- hash:91d766f6ff0a -->

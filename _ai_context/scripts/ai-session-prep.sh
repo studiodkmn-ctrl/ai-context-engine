@@ -130,7 +130,8 @@ if [ -n "$TASK_HINT" ]; then
     rout*|nav*|page*)
       SUGGESTED_DOMAIN="frontend"
       SUGGESTED_FILES="frontend/routing.md" ;;
-    API|api|backend|endpoint*|route*)
+    # route* entfernt: totes Pattern — rout* (frontend/routing) matcht immer zuerst (SC2222)
+    API|api|backend|endpoint*)
       SUGGESTED_DOMAIN="backend"
       SUGGESTED_FILES="backend/endpoints.md" ;;
     auth*|login|JWT|session|middleware)
@@ -449,13 +450,11 @@ NPM_RULE
   # Section 0.6: Code-Navigation (v6.6) — Symbol Map + Interface Snapshot + Hot Paths
   # Zeigt Pointer zu auto-generierten Navigationsdateien + inlined hot_paths wenn vorhanden
   HOT_PATHS_FILE="$CONTEXT_DIR/hot_paths.md"
-  NAV_SHOWN=false
 
   if [ -f "$SYMBOLS_FILE" ] || [ -f "$INTERFACES_FILE" ] || [ -f "$HOT_PATHS_FILE" ]; then
     echo ""
     echo "## 🧭 Code-Navigation"
     echo ""
-    NAV_SHOWN=true
   fi
 
   if [ -f "$SYMBOLS_FILE" ]; then
@@ -797,7 +796,7 @@ PYEOF
   if ! $MINIMAL_MODE && [ -f "$GLOBAL_GOTCHAS" ]; then
     # Lese aktuellen Stack aus _quick_facts.md für Relevanz-Filter
     CURRENT_STACK=$(grep -iE "Stack:|Framework:|Tech:" "$QUICK_FILE" 2>/dev/null | head -3 | sed 's/.*: *//' | tr '[:upper:]' '[:lower:]' | tr '\n' ' ' || echo "")
-    FILTERED_GLOBAL=$(python3 - "$GLOBAL_GOTCHAS" "$CURRENT_STACK" << 'PYEOF'
+    FILTERED_GLOBAL=$(python3 - "$GLOBAL_GOTCHAS" "$CURRENT_STACK" 2>/dev/null << 'PYEOF'
 import re, sys
 
 fpath, stack_str = sys.argv[1], sys.argv[2].lower()
@@ -830,7 +829,7 @@ for m in matched:
 import sys as _sys
 _sys.stderr.write(f"Stack-Filter: {len(matched)} global gotchas relevant\n")
 PYEOF
-2>/dev/null || echo "")
+)
 
     if [ -n "$FILTERED_GLOBAL" ]; then
       FILTERED_COUNT=$(echo "$FILTERED_GLOBAL" | python3 -c "import re,sys; print(len(re.findall(r'ID:|RULE:', sys.stdin.read())))" 2>/dev/null || echo "?")

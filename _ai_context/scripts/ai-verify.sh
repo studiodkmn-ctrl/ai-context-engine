@@ -28,7 +28,7 @@ TIMEOUT_S=120
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR" || exit 1
 
 # --- Override aus _quick_facts.md lesen ---
 read_override() {

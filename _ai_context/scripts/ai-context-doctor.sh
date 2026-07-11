@@ -603,6 +603,7 @@ count_fixkind_warn() {
 print_report() {
   echo -e "${CYAN}🩺 ai-context-doctor — $PROJECT_NAME${NC}"
   echo ""
+  # shellcheck disable=SC2034  # fixkind = Platzhalter der IFS-Spaltung (Feld 4)
   while IFS='|' read -r tag cid status fixkind msg; do
     [ "$tag" = "CHECK" ] || continue
     case "$status" in

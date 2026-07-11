@@ -24,7 +24,9 @@ PROJECT_DIR="$(cd "$CONTEXT_DIR/.." && pwd)"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 TODAY=$(date +"%Y-%m-%d")
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RED='\033[0;31m'; BOLD='\033[1m'; NC='\033[0m'
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+# shellcheck disable=SC2034  # Farb-Palette: einheitlich deklariert, nicht jede Farbe wird genutzt
+RED='\033[0;31m'
 
 DRY_RUN=false
 FORCE=false

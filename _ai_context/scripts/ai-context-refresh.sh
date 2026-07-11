@@ -74,7 +74,8 @@ else
     invalidate() {
       local context_file="$1"
       local marker="$2"
-      local escaped=$(echo "$context_file" | sed 's/\//\\\//g')
+      local escaped
+      escaped=$(echo "$context_file" | sed 's/\//\\\//g')
       
       # Fix: match the actual table format in _ai_index.md
       # Pattern: | `filename` | ✅ | or | `filename` | ⚠️ |

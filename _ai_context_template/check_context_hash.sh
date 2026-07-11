@@ -17,7 +17,9 @@ HASH_FILE="$CONTEXT_DIR/.context_hash"
 INDEX_FILE="$CONTEXT_DIR/_ai_index.md"
 TEMP_HASH="/tmp/.context_hash_new"
 
-YELLOW='\033[1;33m'; CYAN='\033[0;36m'; GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
+YELLOW='\033[1;33m'; CYAN='\033[0;36m'; GREEN='\033[0;32m'; NC='\033[0m'
+# shellcheck disable=SC2034  # Farb-Palette: einheitlich deklariert, nicht jede Farbe wird genutzt
+RED='\033[0;31m'
 
 # ---- Registry-basierter Dedup (v6.0) — schneller als Jaccard ----
 # Usage: bash check_context_hash.sh --dedup-registry
@@ -198,7 +200,6 @@ echo ""
 echo -e "${YELLOW}⚠️  Changes detected outside git (npm install / AI edits / codegen):${NC}"
 
 CHANGED_FILES=$(diff "$HASH_FILE" "$TEMP_HASH" | grep "^>" | awk '{print $3}' | head -10)
-TODAY=$(date +"%Y-%m-%d")
 
 # Map changed files to context files
 AFFECTED=()
@@ -219,6 +220,7 @@ while IFS= read -r file; do
 done <<< "$CHANGED_FILES"
 
 # Deduplicate
+# shellcheck disable=SC2207  # Elemente sind Kontext-Dateipfade ohne Whitespace
 UNIQUE_AFFECTED=($(echo "${AFFECTED[@]}" | tr ' ' '\n' | sort -u))
 
 # Mark affected context files as ⚠️

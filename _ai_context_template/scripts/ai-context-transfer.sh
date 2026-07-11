@@ -35,7 +35,6 @@ REGISTRY="$CONTEXT_DIR/registry.yaml"
 SEEN_FILE="$SELF_STORE/.transfer-seen"
 INBOX="$SELF_STORE/transfer-inbox.yaml"
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 MODE="${1:-}"
 

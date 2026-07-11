@@ -424,7 +424,6 @@ if changed:
 else:
     print("UPTODATE")
 PYMERGE
-    merge_result=$?
     echo -e "${GREEN}✅   .claude/settings.json (Hooks gemerged in existierende Datei)${NC}"
   elif [ -f "$CLAUDE_SETTINGS_TARGET" ]; then
     echo -e "${YELLOW}⚠️  .claude/settings.json existiert + python3 fehlt — Hooks manuell hinzufügen${NC}"

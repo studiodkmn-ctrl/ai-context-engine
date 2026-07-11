@@ -10,6 +10,7 @@
 # =============================================================================
 set -euo pipefail
 
+# shellcheck disable=SC2034  # Farb-Palette: einheitlich deklariert, nicht jede Farbe wird genutzt
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; BOLD='\033[1m'; NC='\033[0m'
 
 LOG_FILE="${HOME}/.ai-context/.session_log.jsonl"

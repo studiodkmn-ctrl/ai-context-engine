@@ -317,6 +317,59 @@ generate_drawers_yaml() {
   state_glob=$(path_to_glob "$STATE_PATH")
   route_glob=$(path_to_glob "$ROUTE_PATH")
 
+  # Glob-Listen pro Schublade (Default: Pfad-Autodetect oben). Stack-
+  # Sonderfälle unten überschreiben sie — dieselbe Fallunterscheidung wie
+  # detect_stack(), damit Django/FastAPI/Express/Go/Rails-Projekte echte
+  # statt Next.js-generischer Globs bekommen (v8 Baustein D).
+  local ui_globs="\"$ui_glob\", \"$route_glob\""
+  local api_globs="\"$api_glob\""
+  local auth_globs="\"$auth_glob\""
+  local data_globs="\"$data_glob\""
+  local state_globs="\"$state_glob\""
+  local api_keywords="endpoint, route, fetch, api"
+  local ui_keywords="button, nav, menu, link, form, click, dropdown, schaltfläche"
+
+  case "$STACK" in
+    *Django*)
+      ui_globs='"templates/**", "**/templates/**", "static/**"'
+      api_globs='"**/views.py", "**/urls.py", "**/serializers.py"'
+      auth_globs='"**/settings.py", "**/middleware*.py"'
+      data_globs='"**/models.py", "**/migrations/**"'
+      state_globs='"**/forms.py"'
+      api_keywords="endpoint, route, api, view, url, drf, serializer"
+      ui_keywords="template, form, button, link, seite, view"
+      ;;
+    *Rails*)
+      ui_globs='"app/views/**", "app/helpers/**", "app/javascript/**"'
+      api_globs='"app/controllers/**", "config/routes.rb"'
+      auth_globs='"app/controllers/concerns/**", "config/initializers/**"'
+      data_globs='"app/models/**", "db/**"'
+      state_globs='"app/javascript/**"'
+      api_keywords="endpoint, route, api, controller, action"
+      ui_keywords="view, partial, form, button, link, erb, turbo"
+      ;;
+    *FastAPI*)
+      api_globs='"routers/**", "app/routers/**", "**/main.py", "**/api/**"'
+      auth_globs='"**/auth*.py", "**/security*.py", "**/deps.py"'
+      data_globs='"**/models.py", "**/schemas.py", "alembic/**"'
+      api_keywords="endpoint, route, api, router, pydantic, schema"
+      ;;
+    *Next.js*|*Nuxt*|*Remix*|*Astro*)
+      : ;;  # JS-Framework: Pfad-Autodetect-Defaults passen bereits
+    *Express*|*Fastify*|*Hono*|*NestJS*)
+      api_globs='"routes/**", "src/routes/**", "src/controllers/**", "**/app.js", "**/server.js"'
+      auth_globs='"middleware/**", "src/middleware/**", "**/auth*.js", "**/auth*.ts"'
+      data_globs='"models/**", "src/models/**", "prisma/**"'
+      api_keywords="endpoint, route, api, controller, middleware"
+      ;;
+    *Go*)
+      api_globs='"**/handlers/**", "cmd/**", "internal/**"'
+      auth_globs='"**/middleware/**", "**/auth/**"'
+      data_globs='"**/models/**", "**/store/**", "migrations/**"'
+      api_keywords="endpoint, route, api, handler, mux"
+      ;;
+  esac
+
   cat > "$target" << YAML
 # drawers.yaml — Schubladen-Manifest (v7)
 # Auto-generiert von setup_ai_context.sh aus der erkannten Projektstruktur ($STACK).
@@ -331,35 +384,35 @@ drawers:
     label: "Interaktive UI-Elemente"
     index: _interaction_map.md
     match:
-      globs: ["$ui_glob", "$route_glob"]
-      keywords: [button, nav, menu, link, form, click, dropdown, schaltfläche]
+      globs: [$ui_globs]
+      keywords: [$ui_keywords]
 
   - id: api
     label: "API-Endpoints"
     index: backend/endpoints.md
     match:
-      globs: ["$api_glob"]
-      keywords: [endpoint, route, fetch, api]
+      globs: [$api_globs]
+      keywords: [$api_keywords]
 
   - id: auth
     label: "Authentifizierung"
     index: backend/auth.md
     match:
-      globs: ["$auth_glob"]
+      globs: [$auth_globs]
       keywords: [login, session, jwt, auth, anmelden, signin]
 
   - id: data
     label: "Datenbank/Schema"
     index: backend/database.md
     match:
-      globs: ["$data_glob"]
+      globs: [$data_globs]
       keywords: [schema, migration, db, query, datenbank]
 
   - id: state
     label: "Client-State"
     index: frontend/state.md
     match:
-      globs: ["$state_glob"]
+      globs: [$state_globs]
       keywords: [store, state, context, redux, zustand]
 
   - id: infra

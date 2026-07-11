@@ -65,6 +65,7 @@ cp "$SCRIPT_DIR/CLAUDE.md" "$INSTALL_DIR/"
 [ -f "$SCRIPT_DIR/auto-update-all.sh" ] && cp "$SCRIPT_DIR/auto-update-all.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/auto-update-all.sh"
 [ -f "$SCRIPT_DIR/context_manager_agent.py" ] && cp "$SCRIPT_DIR/context_manager_agent.py" "$INSTALL_DIR/"
 [ -f "$SCRIPT_DIR/ai-anon.sh" ] && cp "$SCRIPT_DIR/ai-anon.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/ai-anon.sh"
+[ -f "$SCRIPT_DIR/uninstall.sh" ] && cp "$SCRIPT_DIR/uninstall.sh" "$INSTALL_DIR/" && chmod +x "$INSTALL_DIR/uninstall.sh" || true
 
 # ---- MCP-Server (Phase 2): kopieren + bauen ----
 if [ -d "$SCRIPT_DIR/mcp" ]; then
@@ -146,13 +147,15 @@ PII_HOOK_CMD='if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context
 # Selfcheck (v8): rate-limitiert (1×/7 Tage), still wenn alles aktuell —
 # meldet sich nur, wenn ein Update angewendet wurde oder fehlschlug.
 SELFCHECK_HOOK_CMD='if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi'
+# Bootstrap-Einladung (v8): einmal pro Projekt, nur Hinweis — kein Auto-Setup.
+BOOTSTRAP_HOOK_CMD='if [ -f ~/.ai-context/hooks/session-bootstrap.sh ]; then bash ~/.ai-context/hooks/session-bootstrap.sh 2>&1 || true; fi'
 
 mkdir -p "$HOME/.claude"
 if command -v python3 &>/dev/null; then
-  python3 - "$GLOBAL_SETTINGS" "$SESSION_HOOK_CMD" "$PII_HOOK_CMD" "$SELFCHECK_HOOK_CMD" << 'PYEOF'
+  python3 - "$GLOBAL_SETTINGS" "$SESSION_HOOK_CMD" "$PII_HOOK_CMD" "$SELFCHECK_HOOK_CMD" "$BOOTSTRAP_HOOK_CMD" << 'PYEOF'
 import json, sys, pathlib
 path = pathlib.Path(sys.argv[1])
-session_cmd, pii_cmd, selfcheck_cmd = sys.argv[2], sys.argv[3], sys.argv[4]
+session_cmd, pii_cmd, selfcheck_cmd, bootstrap_cmd = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 
 if path.exists():
     try:
@@ -179,6 +182,7 @@ def ensure_hook(event_name, needle, command):
 changed = False
 if ensure_hook("SessionStart",     "ai-session-prep.sh",      session_cmd):   changed = True
 if ensure_hook("SessionStart",     "ai-context-selfcheck.sh", selfcheck_cmd): changed = True
+if ensure_hook("SessionStart",     "session-bootstrap.sh",    bootstrap_cmd): changed = True
 if ensure_hook("UserPromptSubmit", "pii-warn.sh",             pii_cmd):       changed = True
 
 if changed:

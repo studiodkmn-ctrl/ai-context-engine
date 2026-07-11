@@ -236,6 +236,28 @@ This creates `_ai_context/` in your project with:
 bash _ai_context/scripts/ai-session-prep.sh
 ```
 
+**Global install (recommended):** `bash install.sh` installs everything to
+`~/.ai-context`, adds shell aliases (`ai-context-setup`, `ai-doctor`, …) and
+a self-update loop — once installed, the engine checks its source at most
+once per week, backs itself up and updates itself and all registered
+projects automatically (visible in the session log, rollback via
+`ai-context-rollback.sh`, integrity-guarded against source tampering).
+
+**Uninstall:** `bash uninstall.sh` — lists exactly what will be removed
+(global store, shell block, hooks), asks once, never touches your projects'
+`_ai_context/` knowledge or foreign git hooks.
+
+---
+
+## Supported platforms
+
+| Platform | Status |
+|---|---|
+| macOS | ✅ tested (primary development platform) |
+| Linux | ✅ tested (CI runs on Ubuntu) |
+| WSL | ⚠️ untested — should work (bash + python3 + node), no guarantees |
+| Windows (native) | ❌ not supported — the engine is bash-based |
+
 ---
 
 ## Commands

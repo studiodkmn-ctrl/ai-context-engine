@@ -1,4 +1,4 @@
-# CLAUDE.md — AI Context System v7
+# CLAUDE.md — AI Context System v8
 > Lebt in `~/.claude/CLAUDE.md` oder `/projekt/CLAUDE.md`. Details: `README.md`.
 
 ## Sprache

@@ -8,7 +8,7 @@
 #
 # locate() (MCP-Tool) nutzt dieses Manifest zum Routing: Query-Keywords
 # treffen eine Schublade -> deren "index"-Datei wird zuerst durchsucht.
-version: "7.0"
+version: "8.0"
 drawers:
   - id: ui_controls
     label: "Interaktive UI-Elemente"

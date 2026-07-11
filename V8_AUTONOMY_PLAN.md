@@ -1,4 +1,6 @@
 # V8 — Autonomie-Plan: Selbstheilend, selbstaktualisierend, für jeden nutzbar
+> **Status: UMGESETZT (2026-07-11)** — Bausteine A–D live als Commits
+> `feat(v8-a)`…`feat(v8-d)` + `chore(v8)` (VERSION 8.0.0), CI grün.
 > Erstellt: 2026-07-10 · Basis: v7.0.0 (siehe V7_PERFEKTIONSPLAN.md), Live-Rollout auf
 > 7 reale Projekte, Produktionsreife-Härtetest (frischer Clone, Migration, install.sh)
 

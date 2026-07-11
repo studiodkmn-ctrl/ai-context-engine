@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# migrate.sh — Additive Migration: AI Context v5.x/v6.x → v7.0
+# migrate.sh — Additive Migration: AI Context v5.x+ → aktuelle Version (siehe VERSION)
 #
 # Aufruf aus dem Root des Ziel-Projekts:
 #   bash /path/to/ai-context-v7/migrate.sh
@@ -28,9 +28,10 @@ BOLD='\033[1m'; RED='\033[0;31m'; NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_TEMPLATE="$SCRIPT_DIR/_ai_context_template"
+ENGINE_VERSION="$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "?")"
 
 echo ""
-echo -e "${BOLD}🔄 AI Context — Migration → v7.0${NC}"
+echo -e "${BOLD}🔄 AI Context — Migration → v${ENGINE_VERSION}${NC}"
 echo ""
 
 # =============================================================================
@@ -60,9 +61,9 @@ fi
 
 # Version anzeigen
 if [ -f "VERSION" ]; then
-  echo -e "   Projekt-Version: ${YELLOW}$(cat VERSION)${NC} → ${GREEN}7.0.0${NC}"
+  echo -e "   Projekt-Version: ${YELLOW}$(cat VERSION)${NC} → ${GREEN}${ENGINE_VERSION}${NC}"
 else
-  echo -e "   AI Context v5.x/v6.x erkannt → ${GREEN}v7.0.0${NC}"
+  echo -e "   AI Context v5.x/v6.x erkannt → ${GREEN}v${ENGINE_VERSION}${NC}"
 fi
 echo ""
 
@@ -469,7 +470,7 @@ echo ""
 # =============================================================================
 
 echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}${BOLD}║  ✅  Migration → AI Context v7.0.0 fertig  ║${NC}"
+echo -e "${GREEN}${BOLD}║  ✅  Migration → AI Context v${ENGINE_VERSION} fertig  ║${NC}"
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BOLD}Neue Befehle in Claude Code:${NC}"

@@ -371,14 +371,14 @@ generate_drawers_yaml() {
   esac
 
   cat > "$target" << YAML
-# drawers.yaml — Schubladen-Manifest (v7)
+# drawers.yaml — Schubladen-Manifest (v8)
 # Auto-generiert von setup_ai_context.sh aus der erkannten Projektstruktur ($STACK).
 # Erweiterbar: eigene Schubladen ergänzen (z.B. payments, emails, cron) —
 # wird nicht überschrieben, wenn diese Datei bereits existiert.
 #
 # locate() (MCP-Tool) nutzt dieses Manifest zum Routing: Query-Keywords
 # treffen eine Schublade -> deren "index"-Datei wird zuerst durchsucht.
-version: "7.0"
+version: "8.0"
 drawers:
   - id: ui_controls
     label: "Interaktive UI-Elemente"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# auto-update-all.sh — Global Auto-Update: alle registrierten Projekte → v7.0
+# auto-update-all.sh — Global Auto-Update: alle registrierten Projekte → aktuelle Version
 #
 # Liest alle Projekte aus ~/.ai-context/projects/*.meta.json, prüft ob sie
 # noch existieren, und ruft für jedes lebende Projekt migrate.sh auf (die
@@ -26,12 +26,13 @@ STORE="${AI_CTX_HOME:-$HOME/.ai-context}"
 TEMPLATE="$STORE/_ai_context_template"
 PROJECTS_DIR="$STORE/projects"
 MIGRATE_SCRIPT="$STORE/migrate.sh"
+ENGINE_VERSION="$(cat "$STORE/VERSION" 2>/dev/null || echo "?")"
 
 DRY=false
 [ "${1:-}" = "--dry" ] && DRY=true
 
 echo ""
-echo -e "${BOLD}🔄 AI Context — Global Auto-Update → v7.0${NC}"
+echo -e "${BOLD}🔄 AI Context — Global Auto-Update → v${ENGINE_VERSION}${NC}"
 echo -e "${DIM}Template: $TEMPLATE${NC}"
 $DRY && echo -e "${YELLOW}(Dry-Run — kein Schreiben)${NC}"
 echo ""
@@ -45,7 +46,7 @@ fi
 
 if [ ! -f "$MIGRATE_SCRIPT" ]; then
   echo -e "${RED}❌ migrate.sh fehlt im globalen Store: $MIGRATE_SCRIPT${NC}"
-  echo -e "   install.sh erneut ausführen: bash /pfad/zu/ai-context-v7/install.sh"
+  echo -e "   install.sh erneut ausführen: bash /pfad/zu/ai-context-engine/install.sh"
   exit 1
 fi
 
@@ -116,7 +117,7 @@ update_project() {
   local exit_code=$?
 
   if [ "$exit_code" -eq 0 ]; then
-    echo -e "   ${GREEN}✅ migriert auf v7.0${NC}"
+    echo -e "   ${GREEN}✅ migriert auf v${ENGINE_VERSION}${NC}"
     # Kurzstatus aus dem migrate.sh-Log extrahieren
     echo "$log" | grep -E "drawers\.yaml|registry\.yaml.*gescannt|scripts/lib" | sed 's/^/   /'
     UPDATED=$((UPDATED + 1))
@@ -141,7 +142,7 @@ echo -e "${BOLD}${GREEN}══════════════════�
 if $DRY; then
   echo -e "${BOLD}${YELLOW}  Dry-Run: ${#LIVE_PROJECTS[@]} Projekte würden geupdated${NC}"
 else
-  echo -e "${BOLD}${GREEN}  ✅ $UPDATED Projekte auf v7.0 migriert${NC}"
+  echo -e "${BOLD}${GREEN}  ✅ $UPDATED Projekte auf v${ENGINE_VERSION} migriert${NC}"
   if [ "$FAILED" -gt 0 ]; then
     echo -e "   ${RED}❌ $FAILED fehlgeschlagen: ${FAILED_PROJECTS[*]}${NC}"
   fi

@@ -89,3 +89,15 @@ Done this sprint:
 - Intent: feat(v7): roll out to all registered projects, close remaining gaps  (2026-07-09) <!-- hash:91d766f6ff0a -->
 
 - Testfakt SMOKE-1783642024558: stdio MCP funktioniert  (2026-07-10) <!-- hash:f0afa93ad961 -->
+
+- Intent: feat(v8-a): self-update loop — selfcheck, rollback, trusted-origin guard  (2026-07-11) <!-- hash:877aa8156959 -->
+
+- Intent: feat(v8-b): self-healing by default — no pro gate, orphan auto-archiving  (2026-07-11) <!-- hash:fad75a6cfed1 -->
+
+- Testfakt SMOKE-1783745314818: stdio MCP funktioniert  (2026-07-11) <!-- hash:0a1fb021efe6 -->
+
+- Testfakt SMOKE-1783745327886: stdio MCP funktioniert  (2026-07-11) <!-- hash:3b71a7cafb8f -->
+
+- Intent: feat(v8-c): CI pipeline + end-to-end self-test harness  (2026-07-11) <!-- hash:2e44a599a34f -->
+
+- Intent: feat(v8-d): onboarding — uninstall, setup invite, stack-aware drawers  (2026-07-11) <!-- hash:c0b5cbb526b4 -->

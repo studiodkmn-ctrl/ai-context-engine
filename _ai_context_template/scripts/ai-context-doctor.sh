@@ -21,6 +21,15 @@
 #   bash ai-context-doctor.sh            # --check: Health-Report (exit 0/1)
 #   bash ai-context-doctor.sh --fix      # mechanische Defekte reparieren
 #   bash ai-context-doctor.sh --session  # still fixen, EINE Zeile (SessionStart)
+#
+# v8: mechanische Fixes sind Standard (kein Pro-Gate mehr) — sie sind rein
+# strukturell (Anker, Map, Session-Refresh, Orphan-Archivierung) und
+# schreiben nie Fließtext-Inhalt. Jede Auto-Reparatur hinterlässt eine
+# Log-Zeile in _temp_notes.md (Recent Changes). Inhaltliche Korrekturen
+# (fixkind CLAUDE) bleiben wie bisher /ai-doctor vorbehalten.
+#
+# Env: AI_CTX_ORPHAN_DAYS — Frist, nach der Orphan-Chunks archiviert
+#      werden (Default 30 Tage seit `seen`).
 # =============================================================================
 set -uo pipefail
 
@@ -28,6 +37,7 @@ CONTEXT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="$(cd "$CONTEXT_DIR/.." && pwd)"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORPHAN_DAYS="${AI_CTX_ORPHAN_DAYS:-30}"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RED='\033[0;31m'; NC='\033[0m'
 
@@ -38,15 +48,6 @@ case "${1:-}" in
   --check|"") MODE="check" ;;
   *) echo "Usage: ai-context-doctor.sh [--check|--fix|--session]" >&2; exit 2 ;;
 esac
-
-# --fix ist Pro-only (Simple: zurückfallen auf --check mit Hinweis)
-if [ "$MODE" = "fix" ] && [ "$(cat "$HOME/.ai-context/edition" 2>/dev/null || echo simple)" != "pro" ]; then
-  echo -e "${YELLOW}⚠️  --fix ist AI Context Pro (automatische Reparatur).${NC}"
-  echo -e "   --check läuft weiterhin — zeigt alle Defekte an."
-  echo -e "   Upgrade: ${CYAN}bash ~/.ai-context/install.sh --pro${NC}"
-  echo ""
-  MODE="check"
-fi
 
 CHECKER="$(mktemp -t aictx-doctor.XXXXXX.py)"
 REPORT="$(mktemp -t aictx-doctor.XXXXXX.txt)"
@@ -459,6 +460,99 @@ run_checks() {
   fi
 }
 
+# ---- Auto-Fix-Protokoll: eine Zeile in _temp_notes.md (Recent Changes) ----
+# Format folgt der post-commit-Konvention "[YYYY-MM-DD] — text" (der Trim in
+# hooks/post-commit matcht ^\[20\d\d- und behält die letzten 5 Zeilen).
+# Schreibt NUR ins Log — stdout bleibt frei (apply_mechanical_fixes gibt
+# den Zähler über stdout zurück).
+log_auto_fix() {
+  local msg="$1"
+  python3 - "$CONTEXT_DIR/_temp_notes.md" "$(date +%Y-%m-%d)" "$msg" << 'PYEOF' > /dev/null 2>&1 || true
+import sys, pathlib, re
+p = pathlib.Path(sys.argv[1])
+if not p.exists():
+    sys.exit(0)
+today, msg = sys.argv[2], sys.argv[3]
+text = p.read_text(encoding='utf-8')
+# Recent-Changes-Block finden: Heading, dann ```-Fence — neue Zeile ans
+# Block-Ende (Trim behält die letzten 5 → unten = neueste).
+m = re.search(r'(##[^\n]*Recent Changes[^\n]*\n+```[^\n]*\n)([\s\S]*?)(```)', text)
+if not m:
+    sys.exit(0)
+line = f'[{today}] — {msg}\n'
+body = m.group(2)
+if line in body:
+    sys.exit(0)
+new = text[:m.start(2)] + body + line + text[m.end(2):]
+p.write_text(new, encoding='utf-8')
+PYEOF
+}
+
+# ---- Orphan-Archivierung: status=orphan + seen älter als $ORPHAN_DAYS ----
+# Verschiebt den kompletten Block (inkl. Anker) in die Archivdatei des
+# jeweiligen Wissensfiles (_gotchas.md → _gotchas_archive.md usw.) — NIE
+# löschen, nur verschieben. Gibt die Anzahl archivierter Blöcke auf stdout.
+archive_stale_orphans() {
+  python3 - "$CONTEXT_DIR" "$SCRIPT_DIR/lib" "$ORPHAN_DAYS" << 'PYEOF' 2>/dev/null || echo 0
+import sys, re, pathlib, datetime
+
+ctx = pathlib.Path(sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+import ctx as ctxlib
+grace_days = int(sys.argv[3])
+
+reg_path = ctx / 'registry.yaml'
+if not reg_path.exists():
+    print(0); sys.exit(0)
+
+today = datetime.date.today()
+stale = []
+for c in ctxlib.parse_registry(str(reg_path))['chunks']:
+    if c.get('status') != 'orphan' or not c.get('seen') or not c.get('file'):
+        continue
+    try:
+        seen = datetime.date.fromisoformat(c['seen'])
+    except ValueError:
+        continue
+    if (today - seen).days >= grace_days:
+        stale.append(c)
+
+archived = 0
+for c in stale:
+    src = ctx / c['file']
+    if not src.exists():
+        continue
+    text = src.read_text(encoding='utf-8')
+    cid = re.escape(c['id'])
+    # Block = optionaler Anker davor + ```-Fence mit ID:/RULE: <id> + optionaler End-Anker
+    pat = re.compile(
+        r'(?:<!-- #' + cid + r' -->\s*\n)?'
+        r'```[ \t]*\n(?:ID:|RULE:)\s*' + cid + r'\b[\s\S]*?```\s*\n'
+        r'(?:<!-- /' + cid + r' -->\s*\n)?'
+    )
+    m = pat.search(text)
+    if not m:
+        continue
+    block = m.group(0).rstrip() + '\n'
+    stem = pathlib.Path(c['file']).name.removesuffix('.md').lstrip('_')
+    dst = src.parent / f'_{stem}_archive.md'
+    if dst.exists():
+        arch = dst.read_text(encoding='utf-8')
+    else:
+        arch = (f'# 📦 {stem} Archiv — automatisch archivierte Einträge\n'
+                f'> Orphan-Einträge (Code-Datei existiert nicht mehr, seen älter als {grace_days} Tage).\n'
+                f'> Verschoben von ai-context-doctor.sh — Inhalt unverändert, nichts gelöscht.\n\n'
+                f'## Archiviert\n')
+    stamp = f'<!-- archiviert {today.isoformat()}: orphan seit >={grace_days}d -->\n'
+    arch = arch.rstrip() + '\n\n' + stamp + block
+    dst.write_text(arch, encoding='utf-8')
+    src.write_text(text[:m.start()] + text[m.end():], encoding='utf-8')
+    archived += 1
+
+print(archived)
+PYEOF
+}
+
 # ---- mechanische Fixes ----
 apply_mechanical_fixes() {
   local fixed=0
@@ -467,16 +561,31 @@ apply_mechanical_fixes() {
   if grep -q '^CHECK|anchors|WARN' "$REPORT" && [ -f "$reg" ]; then
     bash "$reg" --add-anchors > /dev/null 2>&1
     bash "$reg" --scan > /dev/null 2>&1
+    log_auto_fix "Auto-Fix: fehlende HTML-Anker injiziert (doctor)"
     fixed=$((fixed + 1))
   fi
   if grep -q '^CHECK|mapdrift|WARN' "$REPORT" && [ -f "$map" ]; then
     bash "$map" > /dev/null 2>&1
+    log_auto_fix "Auto-Fix: Interaction Map regeneriert (doctor)"
     fixed=$((fixed + 1))
   fi
   local prep="$SCRIPT_DIR/ai-session-prep.sh"
   if grep -q '^CHECK|stalesession|WARN' "$REPORT" && [ -f "$prep" ]; then
     bash "$prep" > /dev/null 2>&1
+    log_auto_fix "Auto-Fix: veraltete _SESSION.md regeneriert (doctor)"
     fixed=$((fixed + 1))
+  fi
+  # Orphan-Chunks (Code-Datei weg, seen > $ORPHAN_DAYS Tage) → Archiv.
+  # Läuft nur, wenn der Freshness-Check Orphans gemeldet hat.
+  if grep -q '^CHECK|freshness|WARN' "$REPORT"; then
+    local archived
+    archived="$(archive_stale_orphans)"
+    case "$archived" in (*[!0-9]*|'') archived=0 ;; esac
+    if [ "$archived" -gt 0 ]; then
+      [ -f "$reg" ] && bash "$reg" --scan > /dev/null 2>&1
+      log_auto_fix "Auto-Fix: $archived Orphan-Eintrag/-Einträge archiviert (>${ORPHAN_DAYS}d ohne Code-Datei)"
+      fixed=$((fixed + 1))
+    fi
   fi
   echo "$fixed"
 }
@@ -549,14 +658,16 @@ case "$MODE" in
 
   session)
     run_checks
-    MECH_BEFORE="$(count_fixkind_warn MECH)"
     FIXED="$(apply_mechanical_fixes)"
     [ "$FIXED" -gt 0 ] && run_checks
     CLAUDE="$(count_fixkind_warn CLAUDE)"
-    if [ "$MECH_BEFORE" -gt 0 ] && [ "$CLAUDE" -gt 0 ]; then
-      echo -e "${CYAN}🩺 Doctor:${NC} $MECH_BEFORE auto-fix, $CLAUDE offen — ${CYAN}/ai-doctor${NC}"
-    elif [ "$MECH_BEFORE" -gt 0 ]; then
-      echo -e "${CYAN}🩺 Doctor:${NC} $MECH_BEFORE mechanisch repariert, sonst gesund"
+    # FIXED statt "MECH vor dem Lauf" zählen: auch die Orphan-Archivierung
+    # (hängt am CLAUDE-markierten freshness-Check) muss sichtbar sein —
+    # keine stille Auto-Reparatur.
+    if [ "$FIXED" -gt 0 ] && [ "$CLAUDE" -gt 0 ]; then
+      echo -e "${CYAN}🩺 Doctor:${NC} $FIXED auto-fix, $CLAUDE offen — ${CYAN}/ai-doctor${NC}"
+    elif [ "$FIXED" -gt 0 ]; then
+      echo -e "${CYAN}🩺 Doctor:${NC} $FIXED mechanisch repariert, sonst gesund"
     elif [ "$CLAUDE" -gt 0 ]; then
       echo -e "${CYAN}🩺 Doctor:${NC} $CLAUDE Punkt(e) offen — ${CYAN}/ai-doctor${NC}"
     else

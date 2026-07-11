@@ -16,6 +16,10 @@
           {
             "type": "command",
             "command": "cat _ai_context/_SESSION.md 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi"
           }
         ]
       }

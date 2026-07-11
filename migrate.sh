@@ -83,6 +83,8 @@ NEW_SCRIPTS=(
   "ai-interface-snapshot.sh"
   "ai-when-broke.sh"
   "ai-invariant-check.sh"
+  "ai-context-selfcheck.sh"
+  "ai-context-rollback.sh"
 )
 
 for script in "${NEW_SCRIPTS[@]}"; do
@@ -230,11 +232,12 @@ DOCTOR_CMD="[ -f _ai_context/scripts/ai-context-doctor.sh ] && bash _ai_context/
 SESSION_CMD="[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk '/^(🧠|✅|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/' || true"
 CAT_SESSION_CMD="cat _ai_context/_SESSION.md 2>/dev/null || true"
 PII_CMD="if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hooks/pii-warn.sh; fi"
+SELFCHECK_CMD="if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi"
 
 mkdir -p ".claude"
 
 if command -v python3 &>/dev/null; then
-  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" << 'PYEOF'
+  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" << 'PYEOF'
 import json, sys, pathlib
 
 path      = pathlib.Path(sys.argv[1])
@@ -242,6 +245,7 @@ doctor_cmd  = sys.argv[2]
 session_cmd = sys.argv[3]
 pii_cmd     = sys.argv[4]
 cat_session_cmd = sys.argv[5]
+selfcheck_cmd   = sys.argv[6]
 
 if path.exists():
     try:
@@ -296,6 +300,23 @@ if not has_cat_session:
     print("   ✅ SessionStart: _SESSION.md-Injektion hinzugefügt")
 else:
     print("   ✅ SessionStart: _SESSION.md-Injektion bereits vorhanden")
+
+# ---- v8: Selfcheck (Selbst-Update-Loop, rate-limitiert, still wenn aktuell) ----
+has_selfcheck = any(
+    any("ai-context-selfcheck" in h.get("command", "") for h in g.get("hooks", []))
+    for g in groups
+)
+if not has_selfcheck:
+    target = groups[0] if groups else {"matcher": "", "hooks": []}
+    target.setdefault("hooks", []).append({"type": "command", "command": selfcheck_cmd})
+    if not groups:
+        groups.insert(0, target)
+    else:
+        groups[0] = target
+    changed = True
+    print("   ✅ SessionStart: ai-context-selfcheck (Selbst-Update) hinzugefügt")
+else:
+    print("   ✅ SessionStart: ai-context-selfcheck bereits vorhanden")
 
 # ---- UserPromptSubmit ----
 pii_groups = hooks.setdefault("UserPromptSubmit", [])

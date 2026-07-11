@@ -13,15 +13,18 @@ set -euo pipefail
 
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; BOLD='\033[1m'; RED='\033[0;31m'; NC='\033[0m'
 
-INSTALL_DIR="$HOME/.ai-context"
+# AI_CTX_HOME: Override für Tests / Wegwerf-Umgebungen (Default ~/.ai-context)
+INSTALL_DIR="${AI_CTX_HOME:-$HOME/.ai-context}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---- Flag-Parsing ----
 PRO_MODE=false
 MIGRATE_ALL=false
+REFRESH=false
 for arg in "$@"; do
   [ "$arg" = "--pro" ]          && PRO_MODE=true
   [ "$arg" = "--migrate-all" ]  && MIGRATE_ALL=true
+  [ "$arg" = "--refresh" ]      && REFRESH=true
   [ "$arg" = "--skip-ollama" ]  && {
     echo -e "${YELLOW}⚠️  --skip-ollama ist veraltet. Standard ist jetzt Simple-Modus (ohne Ollama).${NC}"
     echo -e "   Für Ollama+RAG: bash install.sh --pro"
@@ -29,7 +32,15 @@ for arg in "$@"; do
   }
 done
 
-if $PRO_MODE; then
+# --refresh (v8): nicht-interaktive Datei-Aktualisierung für den Selbst-Update-
+# Loop (ai-context-selfcheck.sh). Behält die installierte Edition bei, fasst
+# weder Ollama noch Shell-RC-Dateien an — nur Templates, Scripts, MCP, Hooks.
+if $REFRESH; then
+  if [ "$(cat "$INSTALL_DIR/edition" 2>/dev/null || echo simple)" = "pro" ]; then
+    PRO_MODE=true
+  fi
+  echo -e "${BOLD}🔄 AI Context — Refresh (Selbst-Update)${NC}"
+elif $PRO_MODE; then
   echo -e "${BOLD}🧠 AI Context v7.0 — Pro Installation${NC}"
   echo -e "   Basis + Ollama + RAG-Cache + Embeddings"
 else
@@ -76,6 +87,18 @@ chmod +x "$INSTALL_DIR/_ai_context_template/check_context_hash.sh"
 chmod +x "$INSTALL_DIR/_ai_context_template/scripts/ai-rag-cache.sh"
 find "$INSTALL_DIR/hooks" -type f -exec chmod +x {} \;
 
+# ---- v8: Versions- und Quell-Metadaten für den Selbst-Update-Loop ----
+# VERSION: installierter Stand (Vergleichsbasis für ai-context-selfcheck.sh)
+[ -f "$SCRIPT_DIR/VERSION" ] && cp "$SCRIPT_DIR/VERSION" "$INSTALL_DIR/VERSION" || true
+# .source-path: woher diese Installation kam (Git-Checkout → Updates möglich)
+printf '%s\n' "$SCRIPT_DIR" > "$INSTALL_DIR/.source-path"
+# .trusted-origin: Remote-URL beim ALLERERSTEN Install — wird danach nie
+# automatisch überschrieben (Integritäts-Guard gegen untergeschobene Quellen).
+if [ ! -f "$INSTALL_DIR/.trusted-origin" ]; then
+  SOURCE_ORIGIN="$(git -C "$SCRIPT_DIR" remote get-url origin 2>/dev/null || echo "")"
+  [ -n "$SOURCE_ORIGIN" ] && printf '%s\n' "$SOURCE_ORIGIN" > "$INSTALL_DIR/.trusted-origin" || true
+fi
+
 # ---- Edition festlegen (simple / pro) ----
 if $PRO_MODE; then
   printf 'pro\n' > "$INSTALL_DIR/edition"
@@ -120,13 +143,16 @@ fi
 GLOBAL_SETTINGS="$HOME/.claude/settings.json"
 SESSION_HOOK_CMD='[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/scripts/ai-session-prep.sh 2>&1 | awk "/^(🧠|✅|__AI_CTX__)/ || /Session bereit/ || /Kontext wird vorbereitet/" || true'
 PII_HOOK_CMD='if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hooks/pii-warn.sh; fi'
+# Selfcheck (v8): rate-limitiert (1×/7 Tage), still wenn alles aktuell —
+# meldet sich nur, wenn ein Update angewendet wurde oder fehlschlug.
+SELFCHECK_HOOK_CMD='if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi'
 
 mkdir -p "$HOME/.claude"
 if command -v python3 &>/dev/null; then
-  python3 - "$GLOBAL_SETTINGS" "$SESSION_HOOK_CMD" "$PII_HOOK_CMD" << 'PYEOF'
+  python3 - "$GLOBAL_SETTINGS" "$SESSION_HOOK_CMD" "$PII_HOOK_CMD" "$SELFCHECK_HOOK_CMD" << 'PYEOF'
 import json, sys, pathlib
 path = pathlib.Path(sys.argv[1])
-session_cmd, pii_cmd = sys.argv[2], sys.argv[3]
+session_cmd, pii_cmd, selfcheck_cmd = sys.argv[2], sys.argv[3], sys.argv[4]
 
 if path.exists():
     try:
@@ -151,8 +177,9 @@ def ensure_hook(event_name, needle, command):
     return False
 
 changed = False
-if ensure_hook("SessionStart",     "ai-session-prep.sh", session_cmd): changed = True
-if ensure_hook("UserPromptSubmit", "pii-warn.sh",        pii_cmd):     changed = True
+if ensure_hook("SessionStart",     "ai-session-prep.sh",      session_cmd):   changed = True
+if ensure_hook("SessionStart",     "ai-context-selfcheck.sh", selfcheck_cmd): changed = True
+if ensure_hook("UserPromptSubmit", "pii-warn.sh",             pii_cmd):       changed = True
 
 if changed:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
@@ -171,7 +198,9 @@ OLLAMA_CONF="$INSTALL_DIR/ollama.conf"
 EMBED_MODEL="nomic-embed-text"
 OLLAMA_OK=false
 
-if $PRO_MODE; then
+# --refresh überspringt Ollama (interaktiv) — die bestehende Installation
+# bleibt unangetastet.
+if $PRO_MODE && ! $REFRESH; then
   echo ""
   echo -e "${BOLD}🤖 Ollama Setup — vollautomatisch${NC}"
   echo ""
@@ -545,7 +574,10 @@ claude() {
 '
 fi
 
-for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+# --refresh fasst Shell-RC-Dateien nicht an (automatisierter Lauf soll keine
+# Nutzer-Dotfiles umschreiben — Marker-Block ändert sich selten; ein manueller
+# install.sh-Lauf aktualisiert ihn bei Bedarf).
+$REFRESH || for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
   if [ -f "$rc" ]; then
     # Entferne kompletten Block zwischen Markern (neues Format v6.0)
     awk '

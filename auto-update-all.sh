@@ -21,7 +21,8 @@ set -euo pipefail
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'
 BOLD='\033[1m'; RED='\033[0;31m'; DIM='\033[2m'; NC='\033[0m'
 
-STORE="$HOME/.ai-context"
+# AI_CTX_HOME: Override für Tests / Wegwerf-Umgebungen (Default ~/.ai-context)
+STORE="${AI_CTX_HOME:-$HOME/.ai-context}"
 TEMPLATE="$STORE/_ai_context_template"
 PROJECTS_DIR="$STORE/projects"
 MIGRATE_SCRIPT="$STORE/migrate.sh"

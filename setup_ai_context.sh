@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
-# setup_ai_context.sh — v6.5 (MCP-Schicht + Symbol Map + Invariant Layer)
+# setup_ai_context.sh — Projekt-Setup (Version: siehe VERSION)
 #
-# NEU in v6.0:
+# Kernfunktionen:
 #   - Universale Stack-Erkennung (20+ Frameworks)
 #   - Zweistufiger Index (_idx/ Domain-Indizes)
 #   - Feinere Backend-Granularität (auth.md, endpoints.md)
@@ -27,6 +27,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TEMPLATE_DIR="$SCRIPT_DIR/_ai_context_template"
 HOOKS_DIR="$SCRIPT_DIR/hooks"
+# Angezeigte Version immer aus VERSION lesen — Banner können nicht mehr veralten
+ENGINE_VERSION="$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "?")"
 TARGET_DIR="$(pwd)"
 CONTEXT_DIR="$TARGET_DIR/_ai_context"
 GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
@@ -191,7 +193,7 @@ ENV_EXISTS=$([ -f "$TARGET_DIR/.env" ] && echo "yes" || echo "no")
 # ---- Header ----
 echo ""
 echo -e "${BOLD}${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${BLUE}║  🧠 AI Context Setup v6.5 — MCP + Symbol Map      ║${NC}"
+printf '%b\n' "${BOLD}${BLUE}║  🧠 AI Context Setup v${ENGINE_VERSION} — MCP + Symbol Map    ║${NC}"
 echo -e "${BOLD}${BLUE}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${CYAN}Projekt:${NC}   $PROJECT_NAME"
@@ -608,7 +610,7 @@ fi
 # ---- Summary ----
 echo ""
 echo -e "${BOLD}${GREEN}═══════════════════════════════════════════════════${NC}"
-echo -e "${BOLD}${GREEN}  ✅ AI Context v6.6 Setup abgeschlossen!${NC}"
+printf '%b\n' "${BOLD}${GREEN}  ✅ AI Context v${ENGINE_VERSION} Setup abgeschlossen!${NC}"
 echo -e "${BOLD}${GREEN}═══════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${BOLD}⚡ Einfach tippen:${NC} ${GREEN}claude${NC}"

@@ -26,9 +26,17 @@ MODE="${1:-check}"
 
 # ---- Reset mode ----
 if [ "$MODE" = "--reset" ]; then
-  sed -i.bak 's/| ⚠️ |/| ✅ |/g; s/| ❌ |/| ✅ |/g' "$INDEX_FILE"
+  # FIX: Die Marker ✅/⚠️/❌ stehen in den Domain-Indizes (_idx/*.md), nicht in
+  # _ai_index.md — dort ist es Spalte 3 mit 🟢/🟡/🔴. Der Reset lief bisher nur
+  # gegen _ai_index.md und traf damit nichts.
+  for _idx in "$CONTEXT_DIR"/_idx/*.md; do
+    [ -f "$_idx" ] || continue
+    sed -i.bak 's/| ⚠️ |/| ✅ |/g; s/| ❌ |/| ✅ |/g' "$_idx"
+    rm -f "${_idx}.bak"
+  done
+  sed -i.bak 's/| 🟡 |/| 🟢 |/g; s/| 🔴 |/| 🟢 |/g' "$INDEX_FILE"
   rm -f "${INDEX_FILE}.bak"
-  echo -e "${GREEN}✅ Alle Status auf ✅ zurückgesetzt${NC}"
+  echo -e "${GREEN}✅ Alle Status zurückgesetzt (_idx/*.md → ✅, _ai_index.md → 🟢)${NC}"
   exit 0
 fi
 
@@ -71,34 +79,54 @@ else
     # Apply invalidation rules
     INVALIDATED=0
     
+    # FIX: Das Muster "| `file` | ✅ |" gehört zu den Domain-Indizes (_idx/*.md,
+    # Status in Spalte 2); angewandt wurde es auf _ai_index.md (Spalte 3, 🟢/🟡/🔴)
+    # → sed traf nie etwas. Gemeldet wurde trotzdem Erfolg, sobald der Dateiname
+    # irgendwo im Index vorkam. Jetzt: richtige Datei, und Meldung nur bei echter
+    # Änderung. _ai_index.md pflegen post-commit und ai-session-prep.sh.
     invalidate() {
       local context_file="$1"
       local marker="$2"
-      local escaped
-      escaped=$(echo "$context_file" | sed 's/\//\\\//g')
-      
-      # Fix: match the actual table format in _ai_index.md
-      # Pattern: | `filename` | ✅ | or | `filename` | ⚠️ |
-      if grep -q "\`${context_file}\`" "$INDEX_FILE" 2>/dev/null; then
-        sed -i.bak "s/| \`${escaped}\` | ✅ /| \`${escaped}\` | ${marker} /" "$INDEX_FILE" 2>/dev/null
-        # Only escalate ⚠️ → ❌, never downgrade ❌ → ⚠️
-        if [ "$marker" = "❌" ]; then
-          sed -i.bak "s/| \`${escaped}\` | ⚠️ /| \`${escaped}\` | ${marker} /" "$INDEX_FILE" 2>/dev/null
-        fi
-        rm -f "${INDEX_FILE}.bak"
+      local changed_any=false
+
+      # Schubladen-Split berücksichtigen: X.md kann als X_core.md/X_extended.md
+      # im Index stehen (ai-context-drawer.sh).
+      local base="${context_file%.md}"
+      local target esc f before after
+      for target in "$context_file" "${base}_core.md" "${base}_extended.md"; do
+        esc=$(echo "$target" | sed 's/\//\\\//g')
+
+        for f in "$CONTEXT_DIR"/_idx/*.md; do
+          [ -f "$f" ] || continue
+          grep -q "| \`${target}\` |" "$f" 2>/dev/null || continue
+          before=$(cat "$f")
+          sed -i.bak "s/| \`${esc}\` | ✅ |/| \`${esc}\` | ${marker} |/" "$f" 2>/dev/null
+          # Nur eskalieren ⚠️ → ❌, nie zurückstufen ❌ → ⚠️
+          if [ "$marker" = "❌" ]; then
+            sed -i.bak "s/| \`${esc}\` | ⚠️ |/| \`${esc}\` | ${marker} |/" "$f" 2>/dev/null
+          fi
+          rm -f "${f}.bak"
+          after=$(cat "$f")
+          if [ "$before" != "$after" ]; then
+            changed_any=true
+          fi
+        done
+      done
+
+      if $changed_any; then
         echo -e "   ${YELLOW}${marker} ${context_file}${NC}"
         INVALIDATED=$((INVALIDATED + 1))
       fi
     }
 
     # Check patterns
-    echo "$CHANGED" | grep -qiE 'prisma|schema|model|migration' && invalidate "backend/database.md" "❌" && invalidate "backend/api.md" "⚠️"
-    echo "$CHANGED" | grep -qiE 'api/|route|views\.py|routers/' && invalidate "backend/api.md" "❌"
+    echo "$CHANGED" | grep -qiE 'prisma|schema|model|migration' && invalidate "backend/database.md" "❌" && invalidate "backend/endpoints.md" "⚠️"
+    echo "$CHANGED" | grep -qiE 'api/|route|views\.py|routers/' && invalidate "backend/endpoints.md" "❌"
     echo "$CHANGED" | grep -qiE 'component|\.tsx|\.jsx' && invalidate "frontend/components.md" "❌"
     echo "$CHANGED" | grep -qiE 'store|context|hook|state' && invalidate "frontend/state.md" "❌"
     echo "$CHANGED" | grep -qiE 'package\.json|requirements\.txt|pyproject' && invalidate "architecture.md" "⚠️" && invalidate "decisions.md" "⚠️"
-    echo "$CHANGED" | grep -qiE '\.env' && invalidate "backend/api.md" "⚠️"
-    echo "$CHANGED" | grep -qiE 'middleware|auth' && invalidate "backend/api.md" "❌" && invalidate "frontend/state.md" "⚠️"
+    echo "$CHANGED" | grep -qiE '\.env' && invalidate "backend/endpoints.md" "⚠️"
+    echo "$CHANGED" | grep -qiE 'middleware|auth' && invalidate "backend/endpoints.md" "❌" && invalidate "frontend/state.md" "⚠️"
     echo "$CHANGED" | grep -qiE 'tailwind|css' && invalidate "frontend/components.md" "⚠️"
     echo "$CHANGED" | grep -qiE 'next\.config|vite\.config' && invalidate "architecture.md" "⚠️"
     echo "$CHANGED" | grep -qiE 'test|spec|\.test\.' && invalidate "testing.md" "⚠️"
@@ -108,6 +136,10 @@ else
   fi
 
   # Update stored hash
+  # v6+ nutzt "Git:"/"Session:", v4/v5 "Last known git hash:"/"Last session date:".
+  # Beide anfassen — die im jeweiligen Projekt fehlende Variante ist ein No-Op.
+  sed -i.bak "s#^Git:.*#Git:      $CURRENT_HASH#" "$INDEX_FILE" 2>/dev/null
+  sed -i.bak "s#^Session:.*#Session:  $TODAY#" "$INDEX_FILE" 2>/dev/null
   sed -i.bak "s#Last known git hash:.*#Last known git hash:    $CURRENT_HASH#" "$INDEX_FILE" 2>/dev/null
   sed -i.bak "s#Last session date:.*#Last session date:      $TODAY#" "$INDEX_FILE" 2>/dev/null
   rm -f "${INDEX_FILE}.bak"

@@ -209,9 +209,9 @@ while IFS= read -r file; do
     *package.json*|*requirements.txt*|*pyproject.toml*)
       AFFECTED+=("architecture.md" "decisions.md") ;;
     *prisma/schema*|*models.py*)
-      AFFECTED+=("backend/database.md" "backend/api.md") ;;
+      AFFECTED+=("backend/database.md" "backend/endpoints.md") ;;
     *src/app/api/*|*routers/*|*views.py*)
-      AFFECTED+=("backend/api.md") ;;
+      AFFECTED+=("backend/endpoints.md") ;;
     *src/components/*)
       AFFECTED+=("frontend/components.md") ;;
     *store/*|*context/*)

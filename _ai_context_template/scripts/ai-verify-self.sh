@@ -14,6 +14,8 @@
 #   4. ai-context-doctor.sh --check meldet 0 [FAIL]
 #   5. locate() (mcp/dist/locate-cli.js) routet eine Button-Query zur
 #      Component-Datei
+#   6. post-commit invalidiert nach einer API-Änderung backend/endpoints.md
+#      wirklich (Wirkung, nicht nur fehlerfreier Durchlauf)
 #
 # Aufruf (aus dem Engine-Repo oder via CI):
 #   bash _ai_context_template/scripts/ai-verify-self.sh
@@ -170,6 +172,39 @@ if [ -f "$LOCATE_CLI" ] && command -v node > /dev/null 2>&1; then
 else
   echo -e "  ${YELLOW}⚠${NC} locate: mcp/dist/locate-cli.js fehlt — vorher bauen: cd mcp && npm run build"
   FAILS=$((FAILS + 1))
+fi
+
+# ---- 6. post-commit: Auto-Invalidierung greift wirklich ----
+# Regression v8.0.1: invalidate_index schrieb das _idx-Muster (| `file` | ✅ |)
+# nach _ai_index.md (Spalte 3, 🟢/🟡/🔴) und war damit vollständig wirkungslos —
+# unbemerkt seit v5, weil kein Test die Wirkung geprüft hat. Nur den Aufruf zu
+# testen reicht nicht: der Hook lief fehlerfrei durch und tat trotzdem nichts.
+PC_HOOK="$ENGINE_ROOT/hooks/post-commit"
+IDX_BACKEND="_ai_context/_idx/backend.md"
+if [ ! -f "$PC_HOOK" ] || [ ! -f "$IDX_BACKEND" ]; then
+  echo -e "  ${YELLOW}⚠${NC} post-commit: Hook oder $IDX_BACKEND fehlt — übersprungen"
+  FAILS=$((FAILS + 1))
+else
+  BEFORE_ROW="$(grep 'backend/endpoints.md' "$IDX_BACKEND" 2>/dev/null || true)"
+  if ! printf '%s' "$BEFORE_ROW" | grep -q '✅'; then
+    echo -e "  ${RED}✗${NC} post-commit: Ausgangsstatus ist nicht ✅ — Test aussagelos"
+    echo "      Zeile: $BEFORE_ROW"
+    FAILS=$((FAILS + 1))
+  else
+    printf '\nexport const revalidate = 0;\n' >> src/app/api/submit/route.ts
+    git -c user.email=ci@test -c user.name=ci add -A
+    git -c user.email=ci@test -c user.name=ci commit -qm "touch api route" > /dev/null 2>&1
+    bash "$PC_HOOK" > "$SANDBOX/post-commit.log" 2>&1
+    AFTER_ROW="$(grep 'backend/endpoints.md' "$IDX_BACKEND" 2>/dev/null || true)"
+    if printf '%s' "$AFTER_ROW" | grep -q '❌'; then
+      echo -e "  ${GREEN}✓${NC} post-commit: API-Änderung invalidiert backend/endpoints.md"
+    else
+      echo -e "  ${RED}✗${NC} post-commit: Status wurde nicht invalidiert"
+      echo "      vorher:  $BEFORE_ROW"
+      echo "      nachher: $AFTER_ROW"
+      FAILS=$((FAILS + 1))
+    fi
+  fi
 fi
 
 echo ""

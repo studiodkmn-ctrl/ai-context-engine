@@ -101,3 +101,9 @@ Done this sprint:
 - Intent: feat(v8-c): CI pipeline + end-to-end self-test harness  (2026-07-11) <!-- hash:2e44a599a34f -->
 
 - Intent: feat(v8-d): onboarding — uninstall, setup invite, stack-aware drawers  (2026-07-11) <!-- hash:c0b5cbb526b4 -->
+
+- Intent: fix: setup_ai_context.sh banner still hardcoded v6.5/v6.6  (2026-07-15) <!-- hash:5928e5a9c898 -->
+
+- Testfakt SMOKE-1785196871833: stdio MCP funktioniert  (2026-07-28) <!-- hash:85dc929a211c -->
+
+- Intent: fix(v8.0.1): Auto-Invalidierung war seit v5 wirkungslos + Verteilung reparieren  (2026-07-28) <!-- hash:5ce43b743b11 -->

@@ -59,6 +59,12 @@ echo ""
 mkdir -p "$INSTALL_DIR"/{projects,shared}
 
 # ---- Kopiere Dateien ----
+# FIX (v8.0.1): cp -r mergt nur. Im Repo zurückgezogene Dateien — etwa nach
+# legacy/ verschobene Einmal-Tools — blieben dadurch für immer im globalen
+# Template liegen und wurden von migrate.sh weiter in alle Projekte verteilt.
+# Beide Verzeichnisse sind vollständig aus dem Repo regenerierbar und enthalten
+# nichts Nutzereigenes, deshalb vor dem Kopieren leeren.
+rm -rf "$INSTALL_DIR/_ai_context_template" "$INSTALL_DIR/hooks"
 cp -r "$SCRIPT_DIR/_ai_context_template" "$INSTALL_DIR/"
 cp -r "$SCRIPT_DIR/hooks" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/setup_ai_context.sh" "$INSTALL_DIR/"

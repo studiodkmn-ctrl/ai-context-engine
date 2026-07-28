@@ -73,57 +73,37 @@ echo ""
 
 echo -e "${CYAN}📜 Scripts installieren...${NC}"
 
-NEW_SCRIPTS=(
-  "ai-context-doctor.sh"
-  "ai-context-map.sh"
-  "ai-context-transfer.sh"
-  "ai-impact-learn.sh"
-  "ai-symptom-router.sh"
-  "ai-verify.sh"
-  "ai-symbol-map.sh"
-  "ai-interface-snapshot.sh"
-  "ai-when-broke.sh"
-  "ai-invariant-check.sh"
-  "ai-context-selfcheck.sh"
-  "ai-context-rollback.sh"
-)
-
-for script in "${NEW_SCRIPTS[@]}"; do
-  src="$SRC_TEMPLATE/scripts/$script"
+# FIX (v8.0.1): Hier standen zwei handgeführte Allowlists (NEW_SCRIPTS /
+# UPDATED_SCRIPTS). Jedes Script, das in beiden fehlte — u.a.
+# ai-context-refresh.sh, ai-verify-self.sh, ai-rag-cache.sh, ai-session-log.sh,
+# ai-context-scan.sh — erreichte bestehende Projekte NIE, egal wie oft migriert
+# wurde. Bugfixes darin blieben dauerhaft im Template hängen.
+# _ai_context/scripts/ ist ein Spiegel des Templates (genau das prüft
+# ai-context-doctor.sh mit "scriptdrift"), deshalb jetzt Vollsynchronisation
+# statt Liste — neue Scripts können nicht mehr vergessen werden.
+SCRIPTS_NEW=0
+SCRIPTS_UPD=0
+for src in "$SRC_TEMPLATE"/scripts/*.sh; do
+  [ -f "$src" ] || continue
+  script="$(basename "$src")"
   dst="_ai_context/scripts/$script"
-  if [ -f "$src" ]; then
+
+  if [ ! -f "$dst" ]; then
     cp "$src" "$dst"
     chmod +x "$dst"
     echo -e "   ✅ $script (neu)"
-  else
-    echo -e "   ${YELLOW}⚠️  $script nicht im Template — übersprungen${NC}"
-  fi
-done
-
-# Kern-Scripts aktualisieren/installieren (v6.5/v7 bringen neue Sektionen).
-# IMMER kopieren, nicht nur wenn schon vorhanden: ein v5.x-Projekt hat z.B.
-# kein ai-context-registry.sh — ohne das gäbe es nach der Migration keine
-# registry.yaml und damit (seit v7 der Rohtext-Fallback weg ist) GAR KEINE
-# Gotchas mehr in _SESSION.md.
-UPDATED_SCRIPTS=(
-  "ai-session-prep.sh"
-  "ai-context-registry.sh"
-  "ai-context-sync.sh"
-  "ai-context-drawer.sh"
-  "ai-context-doctor.sh"
-  "ai-context-map.sh"
-  "ai-symptom-router.sh"
-)
-
-for script in "${UPDATED_SCRIPTS[@]}"; do
-  src="$SRC_TEMPLATE/scripts/$script"
-  dst="_ai_context/scripts/$script"
-  if [ -f "$src" ]; then
+    SCRIPTS_NEW=$((SCRIPTS_NEW + 1))
+  elif ! diff -q "$src" "$dst" > /dev/null 2>&1; then
     cp "$src" "$dst"
     chmod +x "$dst"
     echo -e "   🔄 $script (aktualisiert)"
+    SCRIPTS_UPD=$((SCRIPTS_UPD + 1))
   fi
 done
+
+if [ "$SCRIPTS_NEW" -eq 0 ] && [ "$SCRIPTS_UPD" -eq 0 ]; then
+  echo -e "   ${GREEN}✓${NC} Scripts bereits aktuell"
+fi
 
 # check_context_hash.sh liegt eine Ebene höher
 if [ -f "$SRC_TEMPLATE/check_context_hash.sh" ] && [ -f "_ai_context/check_context_hash.sh" ]; then

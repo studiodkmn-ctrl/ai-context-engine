@@ -475,6 +475,120 @@ run_checks() {
       echo "CHECK|localtemplatedrift|PASS|NONE|_ai_context/scripts ↔ _ai_context_template/scripts synchron" >> "$REPORT"
     fi
   fi
+
+  # Check 11 (V10 R1): Demo-Inhalte nie ersetzt + falsche Projekt-Identität.
+  # setup_ai_context.sh liefert Demo-Chunks (prisma_singleton, auth_first, ...)
+  # als Startpunkt aus — bleiben sie unverändert, matcht locate() gegen ein
+  # fiktives Next.js-Projekt statt gegen das echte. Genau das war im
+  # Engine-Repo selbst monatelang der Fall (7 von 10 Chunks Demo-Reste, siehe
+  # decisions.md#demo_content). NUR warnen, nie löschen: in echten
+  # Next.js-Projekten können die Demo-Regeln zufällig zutreffen.
+  local tmpl_root=""
+  if [ -d "$HOME/.ai-context/_ai_context_template" ]; then
+    tmpl_root="$HOME/.ai-context/_ai_context_template"
+  elif [ -d "$PROJECT_DIR/_ai_context_template" ]; then
+    tmpl_root="$PROJECT_DIR/_ai_context_template"
+  fi
+
+  if [ -n "$tmpl_root" ] && [ -f "$SCRIPT_DIR/lib/ctx.py" ]; then
+    local demo_findings=()
+
+    # -- Teil 1: Chunks, die Zeichen für Zeichen dem Template entsprechen --
+    local manifest="$CONTEXT_DIR/knowledge.manifest.yaml"
+    local kfiles=()
+    if [ -f "$manifest" ]; then
+      while IFS= read -r kf; do
+        [ -n "$kf" ] && kfiles+=("$kf")
+      done < <(python3 "$SCRIPT_DIR/lib/ctx.py" list_knowledge_files "$manifest" 2>/dev/null)
+    fi
+
+    local kf proj_file tmpl_file
+    for kf in "${kfiles[@]}"; do
+      proj_file="$CONTEXT_DIR/$kf"
+      tmpl_file="$tmpl_root/$kf"
+      [ -f "$proj_file" ] && [ -f "$tmpl_file" ] || continue
+      while IFS= read -r dup_id; do
+        [ -n "$dup_id" ] && demo_findings+=("$dup_id ($kf) — unverändert aus Template")
+      done < <(python3 - "$proj_file" "$tmpl_file" "$SCRIPT_DIR/lib" << 'PYEOF' 2>/dev/null
+import sys, pathlib
+sys.path.insert(0, sys.argv[3])
+import ctx as ctxlib
+
+proj = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="ignore")
+tmpl = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8", errors="ignore")
+
+def chunks(text):
+    out = {}
+    for m in ctxlib.ANCHOR_RE.finditer(text):
+        cid = m.group(1)
+        if cid.startswith("_") or cid.lower() == "template":
+            continue
+        out[cid] = " ".join(m.group(2).split())
+    return out
+
+p, t = chunks(proj), chunks(tmpl)
+for cid, body in p.items():
+    if cid in t and t[cid] == body:
+        print(cid)
+PYEOF
+      )
+    done
+
+    # -- Teil 1b: Dateien, die nur aus Vorlagen-Hinweisen bestehen --
+    # Ganze Domain-Dateien (backend/auth.md, frontend/routing.md, ...) haben
+    # keine Anker und entgehen daher Teil 1. Sie sind aber genauso Fiktion,
+    # wenn sie nie befuellt wurden — erkennbar an gehaeuften "[z.B. ...]"/
+    # "[Bitte ...]"-Hinweisen (Check 3 ignoriert die bewusst einzeln, ab 3
+    # Stueck in einer Datei ist es aber ein klares "nie angefasst"-Signal).
+    while IFS= read -r hint_line; do
+      [ -n "$hint_line" ] && demo_findings+=("$hint_line")
+    done < <(python3 - "$CONTEXT_DIR" << 'PYEOF' 2>/dev/null
+import sys, re, pathlib
+
+ctx = pathlib.Path(sys.argv[1])
+HINT = re.compile(r'\[(?:z\.B\.|e\.g\.|Bitte |Kurzbeschreibung|was falsch|betroffene )')
+# Vorlagen-BLOECKE (ID: _template ...) sind legitime Muster-Beispiele und
+# duerfen nicht als "nie befuellt" zaehlen — sonst meldet jede korrekt
+# gepflegte Wissensdatei einen Fehlalarm.
+TEMPLATE_BLOCK = re.compile(r'```\s*\n(?:ID|RULE|PLAYBOOK):\s*_[\s\S]*?```')
+
+for p in sorted(ctx.rglob("*.md")):
+    parts = set(p.parts)
+    if "_cache" in parts or p.name == "_SESSION.md":
+        continue
+    try:
+        text = p.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        continue
+    n = len(HINT.findall(TEMPLATE_BLOCK.sub("", text)))
+    if n >= 3:
+        print(f"{p.relative_to(ctx)} — {n} Vorlagen-Hinweise, nie befüllt")
+PYEOF
+    )
+
+    # -- Teil 2: Projekt-Identität in _quick_facts.md --
+    local quick="$CONTEXT_DIR/_quick_facts.md"
+    if [ -f "$quick" ]; then
+      local declared actual norm_declared norm_actual
+      declared="$(grep -m1 '^Project:' "$quick" 2>/dev/null | sed 's/^Project:[[:space:]]*//' | tr -d '\r')"
+      actual="$(basename "$PROJECT_DIR")"
+      norm_declared="$(printf '%s' "$declared" | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
+      norm_actual="$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
+      if [ -n "$norm_declared" ] && [ "$norm_declared" != "$norm_actual" ]; then
+        demo_findings+=("_quick_facts.md — Project: '$declared' ≠ Verzeichnis '$actual'")
+      fi
+    fi
+
+    if [ ${#demo_findings[@]} -gt 0 ]; then
+      echo "CHECK|demo_content|WARN|CLAUDE|${#demo_findings[@]} Demo-/Identitäts-Rest(e) — Kontext beschreibt fremdes Projekt" >> "$REPORT"
+      local df
+      for df in "${demo_findings[@]}"; do
+        echo "DETAIL|demo_content|$df" >> "$REPORT"
+      done
+    else
+      echo "CHECK|demo_content|PASS|NONE|Kontext ist projekteigen (keine Template-Reste)" >> "$REPORT"
+    fi
+  fi
 }
 
 # ---- Auto-Fix-Protokoll: eine Zeile in _temp_notes.md (Recent Changes) ----

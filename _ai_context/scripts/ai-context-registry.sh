@@ -96,7 +96,15 @@ for rel_file, chunk_type in KNOWLEDGE_FILES:
     found = list(ANCHOR_RE.finditer(content))
 
     if not found:
-        if re.search(r'```\s*\n(?:ID:|RULE:|PLAYBOOK:)', content):
+        # Platzhalter-Bloecke (ID: _template) zaehlen NICHT als "vergessener
+        # Anker" — sie werden von --add-anchors bewusst uebersprungen. Ohne
+        # diese Ausnahme meldet jede frisch aufgesetzte (oder von Demo-Reten
+        # bereinigte) Wissensdatei faelschlich "nicht indexiert".
+        real_blocks = [
+            m for m in re.finditer(r'```\s*\n(?:ID:|RULE:|PLAYBOOK:)\s*(\S+)', content)
+            if not (m.group(1).startswith('_') or m.group(1).lower() == 'template')
+        ]
+        if real_blocks:
             no_anchor_files.append(rel_file)
         continue
 

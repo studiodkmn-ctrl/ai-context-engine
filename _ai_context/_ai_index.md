@@ -11,9 +11,9 @@ Nächstes:       [Was als nächstes ansteht]
 
 ## Projekt
 ```
-Stack:    Test
-Phase:    Beta
-Git:      179d8832b88ee6f4f5c888aca43bf2a836a0dbd9
+Stack:    Bash + Python 3 + TypeScript (MCP)
+Phase:    aktiv
+Git:      171c524452097d5fe698e8cd411eb84fab455ba2
 Session:  2026-08-09
 ```
 
@@ -21,11 +21,13 @@ Session:  2026-08-09
 
 | Datei | Enthält | Status | Zuletzt |
 |---|---|---|---|
-| `frontend/components.md` | UI | 🟢 | 14.04 |
-| `backend/auth.md` | Auth | 🟢 | 14.04 |
-| `backend/endpoints.md` | API | 🟢 | 14.04 |
-| `security.md` | Security | 🟢 | 14.04 |
+| `architecture.md` | Schichten, Datenfluss, Invarianten | 🟢 | 09.08 |
+| `decisions.md` | ADRs (006–008) | 🟢 | 09.08 |
+| `testing.md` | 3 Prüfschichten der Engine | 🟢 | 09.08 |
+| `_gotchas.md` | 2 projekteigene Gotchas | 🟢 | 09.08 |
+| `playbooks.md` | add_knowledge_file | 🟢 | 09.08 |
 
 ## 📦 Schubladen (Archiv-Pointer)
 ```
-`frontend/state_extended.md`  ← Erweiterte Einträge. Core: `frontend/state_core.md````
+(keine — Archive sind leer)
+```

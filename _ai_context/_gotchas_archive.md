@@ -5,14 +5,6 @@
 ## Archiviert
 
 <!-- archiviert 2026-08-06: orphan seit >=30d -->
-<!-- #auth_version -->
-```
-ID: auth_version
-P: 2
-→ NextAuth v5 ≠ v4
-✗ getServerSession()          ← v4, veraltet
-✓ auth() from "next-auth"     ← v5, korrekt
-? session.user undefined → prüfe auth callback signature
-@ src/lib/auth.ts, alle API routes
-```
-<!-- /auth_version -->
+
+> Leer — die zuvor hier archivierten Einträge waren Demo-Inhalte
+> aus dem Template (siehe decisions.md#demo_content).

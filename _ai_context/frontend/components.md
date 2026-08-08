@@ -1,62 +1,14 @@
-# 🎨 Frontend — Components
-**Status:** 🟢 Fresh · **Updated:** 2026-04-14 · **Invalidated by:** `src/components/**`, `src/app/**/page.tsx`, `tailwind.config.*`
+# 🎨 Components — ai-context-engine
+> Aktualisiert: 2026-08-09
 
----
-
-## Component Inventory
-
-> **Pflicht-Regel:**
-> - Neue sichtbare UI-Komponente erstellt → **sofort hier eintragen**.
-> - Komponente gelöscht/umbenannt → **Tabelle sofort aktualisieren**.
-> - Claude: Diese Tabelle ist der Grund, warum du keine Ordner scannen musst.
-
-| Component | Path | Purpose | Key Props |
-|---|---|---|---|
-| `Button` | `components/ui/button.tsx` | Base button | `variant`, `size`, `onClick` |
-| `Header` | `components/layout/header.tsx` | Top navigation | `user`, `onLogout` |
-| `[NAME]` | `components/features/[...].tsx` | [Purpose] | [Props] |
-
----
-
-## Pages & Routing
+## Nicht zutreffend für dieses Projekt
 ```
-src/app/
-├── (auth)/
-│   ├── login/page.tsx          → Login form
-│   └── register/page.tsx       → Registration
-├── (dashboard)/
-│   ├── layout.tsx              → Dashboard layout (auth guard)
-│   ├── page.tsx                → Dashboard overview
-│   └── [feature]/page.tsx      → Feature page
-└── layout.tsx                  → Root layout (providers, theme)
+Kein Frontend — die Engine hat keine UI-Komponenten.
+Nutzerkontakt entsteht über Shell-Ausgaben und die in _SESSION.md
+injizierten Kontexte.
 ```
 
----
-
-## Styling Conventions
-```
-System:       Tailwind CSS utility-first
-Dark mode:    [class / media / disabled]
-Breakpoints:  mobile-first (sm: md: lg: xl: 2xl:)
-Components:   [e.g. card-based, rounded-xl shadow-sm]
-
-Custom CSS:   ONLY in globals.css (resets + CSS vars)
-              Exception: complex animations only
-```
-
----
-
-## Gotchas
-```
-- [e.g. "Next.js Image always needs width+height or fill+sizes"]
-- [e.g. "'use client' only when truly needed — default is Server Component"]
-- [e.g. "Suspense boundaries around all async Server Components"]
-- [e.g. "shadcn components via 'npx shadcn add [name]' — never manually"]
-```
-
----
-
-## Update Log
-```
-2026-04-14 — Initial setup
-```
+> Die zuvor hier stehenden Inhalte waren unveränderte Demo-Beispiele aus
+> `_ai_context_template/` (Next.js/Prisma) und beschrieben nicht diese
+> Engine — entfernt in V10 R1, siehe decisions.md#demo_content.
+> Im Template bleiben sie als Startpunkt für neue Projekte erhalten.

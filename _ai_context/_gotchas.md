@@ -9,7 +9,7 @@
 ```
 ID: stopword_lists_incomplete
 P: 2
-seen: 2026-08-08
+seen: 2026-08-09
 → locate()/ai-symptom-router.sh/ctx.py pflegen je eine STOP(WORDS)-Liste;
   ein fehlendes Wort (z.B. "wie" fehlte) matcht als "lebendiges" Token
   fast jeden Prosa-Kommentar mit ähnlicher Formulierung → False-Positive
@@ -28,7 +28,7 @@ seen: 2026-08-08
 ```
 ID: silent_noop_needs_effect_test
 P: 1
-seen: 2026-08-06
+seen: 2026-08-09
 → Hook/Skript kann fehlerfrei durchlaufen und trotzdem nichts bewirken
   (falsches Zielmuster/Pfad) — kein Fehler beweist keine Wirkung
 ✗ Test prüft nur Exit-Code
@@ -38,17 +38,6 @@ seen: 2026-08-06
 @ hooks/post-commit, ai-verify-self.sh
 ```
 <!-- /silent_noop_needs_effect_test -->
-
-<!-- #prisma_singleton -->
-```
-ID: prisma_singleton
-P: 2
-→ Hot-Reload erzeugt N Prisma-Instanzen → Pool voll
-✗ new PrismaClient()
-✓ import { prisma } from "@/lib/prisma"
-@ alle DB-Zugriffe
-```
-<!-- /prisma_singleton -->
 
 ```
 ID: _template

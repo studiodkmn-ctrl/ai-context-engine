@@ -1,28 +1,13 @@
 # 🗺️ Routing — ai-context-engine
-> **~150 Tokens. Laden bei Routing/Navigation-Aufgaben.**
-> Zuletzt aktualisiert: 2026-04-14
+> Aktualisiert: 2026-08-09
 
-## Routing-Typ
+## Nicht zutreffend für dieses Projekt
 ```
-Framework:    [z.B. Next.js App Router / React Router v6 / Vue Router]
-Strategie:    [z.B. file-based / config-based]
-```
-
-## Routen-Struktur
-```
-/                    → Landing/Home
-/dashboard           → geschützt (user+)
-/admin               → geschützt (admin)
-/auth/login          → öffentlich
-/auth/register       → öffentlich
-/api/*               → API-Routen (siehe backend/endpoints.md)
+Kein Frontend-Routing. Das Pendant ist das Kontext-Routing:
+drawers.yaml (Schubladen) + locate() — siehe architecture.md.
 ```
 
-## Geschützte Routen
-```
-Middleware:    [z.B. middleware.ts prüft auf / dashboard, /admin]
-Redirect:     [z.B. → /auth/login wenn nicht authentifiziert]
-```
-
----
-> Writeback: Neue Route → Struktur oben ergänzen.
+> Die zuvor hier stehenden Inhalte waren unveränderte Demo-Beispiele aus
+> `_ai_context_template/` (Next.js/Prisma) und beschrieben nicht diese
+> Engine — entfernt in V10 R1, siehe decisions.md#demo_content.
+> Im Template bleiben sie als Startpunkt für neue Projekte erhalten.

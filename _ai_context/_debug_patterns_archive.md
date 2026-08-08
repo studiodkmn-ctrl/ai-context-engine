@@ -5,17 +5,6 @@
 ## Archiviert
 
 <!-- archiviert 2026-08-06: orphan seit >=30d -->
-<!-- #prisma_connection -->
-```
-ID: prisma_connection
-P: 2
-→ DB-Verbindung schlägt fehl
-? "Can't reach database" / P1001 Error
-fix:
-  1. DATABASE_URL in .env prüfen
-  2. npx prisma generate
-  3. npx prisma db push
-@ prisma/schema.prisma, .env
-⇒ _gotchas.md#prisma_singleton
-```
-<!-- /prisma_connection -->
+
+> Leer — die zuvor hier archivierten Einträge waren Demo-Inhalte
+> aus dem Template (siehe decisions.md#demo_content).

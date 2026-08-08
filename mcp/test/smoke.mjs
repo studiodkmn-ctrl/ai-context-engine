@@ -63,10 +63,15 @@ searchRes.includes(marker) ? pass('memory_search findet gespeicherten Fakt') : f
 const empty = await callText('memory_search', { query: 'zxqwvbnmplkjhgfdsa-unfindbar' });
 empty.includes('Kein Treffer') ? pass('Leersuche graceful') : fail('Leersuche unerwartet: ' + empty);
 
-// 5b) locate — findet den prisma_singleton-Gotcha per Symptom-Match
-const locateRes = await callText('locate', { query: 'prisma pool voll' });
-console.log('\n[locate prisma]\n' + locateRes.slice(0, 240));
-locateRes.includes('prisma_singleton') ? pass('locate findet prisma_singleton') : fail('locate fand prisma_singleton nicht: ' + locateRes);
+// 5b) locate — findet einen Gotcha per Symptom-Match.
+// Bewusst ein ENGINE-EIGENER P1-Chunk (P: 1 = "nie löschen") statt eines
+// Demo-Chunks: der Test hing vorher an `prisma_singleton` aus dem Template
+// und brach, sobald die Demo-Inhalte korrekt entfernt wurden (V10 R1).
+const locateRes = await callText('locate', { query: 'hook laeuft fehlerfrei durch bewirkt aber nichts' });
+console.log('\n[locate silent_noop]\n' + locateRes.slice(0, 240));
+locateRes.includes('silent_noop_needs_effect_test')
+  ? pass('locate findet silent_noop_needs_effect_test')
+  : fail('locate fand silent_noop_needs_effect_test nicht: ' + locateRes);
 
 // 6) capture_from_diff (nur Vorschlag-Modus, darf auch leer sein)
 const cap = await callText('capture_from_diff', {});

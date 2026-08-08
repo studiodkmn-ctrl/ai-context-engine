@@ -1,30 +1,16 @@
 # 🔐 Auth — ai-context-engine
-> **Laden bei Auth/Login/Middleware-Tasks.**
-> Aktualisiert: 2026-04-14
+> Aktualisiert: 2026-08-09
 
-## Config
+## Nicht zutreffend für dieses Projekt
 ```
-provider:  [NextAuth v5 / Clerk / Supabase Auth]
-session:   [JWT / Cookie]
-expires:   [30d]
-```
-
-## Pattern
-```
-# Jede geschützte Route:
-const session = await auth()           ← ⇒ security.md#auth_first
-if (!session?.user) return error(401)
-
-# Middleware:
-matcher: ["/api/:path*"]
-exclude: ["/api/public/:path*", "/api/health"]
+Die Engine hat keine Benutzer-Authentifizierung — sie ist ein
+lokales CLI-/MCP-Werkzeug ohne Server, Login oder Sessions.
+Zugriffsschutz-relevant sind stattdessen: der Trusted-Origin-Guard
+für Auto-Updates (decisions.md ADR-005) und der PII-Hook
+(hooks/pii-warn.sh).
 ```
 
-## Rollen
-```
-admin → /api/admin/*    (alle Methoden)
-user  → /api/user/*     (alle Methoden)
--     → /api/public/*   (nur GET)
-```
-
-> Writeback: Neue Rolle/Route → hier. Neuer Endpoint → `backend/endpoints.md`
+> Die zuvor hier stehenden Inhalte waren unveränderte Demo-Beispiele aus
+> `_ai_context_template/` (Next.js/Prisma) und beschrieben nicht diese
+> Engine — entfernt in V10 R1, siehe decisions.md#demo_content.
+> Im Template bleiben sie als Startpunkt für neue Projekte erhalten.

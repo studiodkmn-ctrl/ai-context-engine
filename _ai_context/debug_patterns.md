@@ -4,20 +4,8 @@
 
 ## Aktiv
 
-<!-- #hydration_mismatch -->
-```
-ID: hydration_mismatch
-P: 2
-→ Server/Client HTML unterschiedlich
-? "Hydration failed" / "Text content mismatch"
-fix: 'use client' Direktive + useEffect für browser-only Code
-  ✗ {typeof window !== 'undefined' && <Component />}
-  ✓ const [mounted, setMounted] = useState(false)
-    useEffect(() => setMounted(true), [])
-    if (!mounted) return null
-@ alle Client-Components mit Browser-APIs
-```
-<!-- /hydration_mismatch -->
+> Noch keine projekteigenen Debug-Patterns — die Demo-Inhalte aus dem
+> Template wurden entfernt (siehe decisions.md#demo_content).
 
 ```
 ID: _template

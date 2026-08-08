@@ -120,13 +120,32 @@ if [ -d "$SRC_TEMPLATE/scripts/lib" ]; then
   echo -e "   ✅ scripts/lib/ (ctx.py, synonyms.txt)"
 fi
 
-# v8.1: playbooks.md (prozedurales Gedächtnis) — additiv wie hot_paths.md/
-# drawers.yaml: nur anlegen wenn noch nicht vorhanden, NIE überschreiben
-# (sonst gingen projekteigene Playbook-Einträge bei jeder Migration verloren).
-if [ ! -f "_ai_context/playbooks.md" ] && [ -f "$SRC_TEMPLATE/playbooks.md" ]; then
-  PROJECT_NAME_PB="$(basename "$(pwd)")"
-  sed "s/\[PROJECT_NAME\]/$PROJECT_NAME_PB/g" "$SRC_TEMPLATE/playbooks.md" > "_ai_context/playbooks.md"
-  echo -e "   ✅ _ai_context/playbooks.md angelegt (prozedurales Gedächtnis)"
+# v9-a: knowledge.manifest.yaml additiv anlegen (wie drawers.yaml: nur wenn
+# noch nicht vorhanden, NIE überschreiben — projekteigene Anpassungen an
+# Limits/Typen sollen eine Migration überleben).
+if [ ! -f "_ai_context/knowledge.manifest.yaml" ] && [ -f "$SRC_TEMPLATE/knowledge.manifest.yaml" ]; then
+  cp "$SRC_TEMPLATE/knowledge.manifest.yaml" "_ai_context/knowledge.manifest.yaml"
+  echo -e "   ✅ _ai_context/knowledge.manifest.yaml angelegt"
+fi
+
+# v9-a: Wissensdateien mit seed:true additiv anlegen (wie hot_paths.md/
+# drawers.yaml: nur wenn noch nicht vorhanden, NIE überschreiben — sonst
+# gingen projekteigene Einträge bei jeder Migration verloren). Generisch
+# über das Manifest statt einer Datei-für-Datei-Sonderbehandlung — das war
+# genau die Lücke, die playbooks.md bei bestehenden Projekten anfangs verpasst
+# hat (siehe decisions.md#knowledge_manifest).
+MANIFEST_FOR_SEED="_ai_context/knowledge.manifest.yaml"
+CTX_PY="_ai_context/scripts/lib/ctx.py"
+if [ -f "$MANIFEST_FOR_SEED" ] && [ -f "$CTX_PY" ]; then
+  PROJECT_NAME_SEED="$(basename "$(pwd)")"
+  while IFS= read -r seed_file; do
+    [ -z "$seed_file" ] && continue
+    if [ ! -f "_ai_context/$seed_file" ] && [ -f "$SRC_TEMPLATE/$seed_file" ]; then
+      mkdir -p "_ai_context/$(dirname "$seed_file")"
+      sed "s/\[PROJECT_NAME\]/$PROJECT_NAME_SEED/g" "$SRC_TEMPLATE/$seed_file" > "_ai_context/$seed_file"
+      echo -e "   ✅ _ai_context/$seed_file angelegt (Manifest: seed:true)"
+    fi
+  done < <(python3 "$CTX_PY" list_knowledge_files "$MANIFEST_FOR_SEED" --seed-only 2>/dev/null)
 fi
 
 # ctx.py erzeugt bei jedem Aufruf __pycache__/ — ohne .gitignore-Eintrag

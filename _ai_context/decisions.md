@@ -51,6 +51,38 @@ SSH known_hosts). Kein Netzwerkzugriff, wenn keine Git-Quelle bekannt ist.
 
 ---
 
+### ADR-006: knowledge.manifest.yaml als einzige Quelle der Wahrheit für Wissensdateien
+**Date:** 2026-08-08 | **Status:** Accepted
+
+**Context:** playbooks.md (v8.1) musste an 6 Stellen von Hand eingetragen
+werden (locate.ts, ai-context-registry.sh, ai-context-doctor.sh,
+hooks/post-commit, migrate.sh, CLAUDE.md). migrate.sh wurde dabei vergessen
+und blieb unbemerkt, bis 9 Projekte bereits ohne die Datei liefen. Beim
+Gegenlesen zeigte sich zusätzlich, dass die bestehenden Listen schon vorher
+inkonsistent waren (architecture.md/decisions.md fehlten in locate.ts und
+ai-context-doctor.sh, obwohl ai-context-registry.sh sie längst scannte).
+**Decision:** `_ai_context/knowledge.manifest.yaml` (+ identische Kopie im
+Template) listet jede Wissensdatei einmal mit path/type/markers/
+max_entries/archive/seed. Ein neuer Parser `ctx.py::load_knowledge_manifest`
+(minimaler zeilenbasierter Parser, kein PyYAML, gleicher Stil wie
+`list_drawer_indexes`) wird von allen fünf Code-Stellen genutzt; migrate.sh
+seedet `seed:true`-Dateien generisch statt Datei-für-Datei-Sonderfällen.
+Jede Stelle behält einen hartcodierten Fallback, falls das Manifest fehlt
+(alte/fremde Installation) — kein Totalausfall bei Downgrade.
+**Consequences:**
+  + Neue Wissensdatei = eine Manifest-Zeile statt sechs Code-Stellen
+    (playbooks.md#add_knowledge_file zeigt den geschrumpften Prozess).
+  + `ai-verify-self.sh` Check 7 beweist die Migrations-Parität automatisch
+    (seed-Datei löschen → migrate.sh → muss wieder da sein) — die
+    v8.1-Fehlerklasse kann strukturell nicht wiederkehren.
+  + Behebt nebenbei die architecture.md/decisions.md-Lücke in locate.ts/
+    ai-context-doctor.sh.
+  - Ein zusätzlicher indirekter Layer (Manifest → Parser → Verhalten) statt
+    direkt lesbarer hartcodierter Listen — Trade-off akzeptiert, weil die
+    Alternative (Drift) real und teuer war.
+
+---
+
 ## ❌ Rejected Alternatives
 > So Claude (and you) don't fall into the same trap again.
 > Bisher keine — Template: `decisions_guide.md`

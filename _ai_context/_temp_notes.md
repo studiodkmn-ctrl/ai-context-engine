@@ -36,3 +36,7 @@ Due:           -
 > Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md
 
 - Intent: feat(v8.1): Duplicate-Read-Guard + playbooks.md (prozedurales Gedächtnis)  (2026-08-08) <!-- hash:37629de39888 -->
+
+- Intent: fix(v8.1.1): migrate.sh vergaß playbooks.md + PreToolUse-Hook  (2026-08-08) <!-- hash:0d03655126dd -->
+
+- Testfakt SMOKE-1786218986998: stdio MCP funktioniert  (2026-08-08) <!-- hash:760ad68b6bd7 -->

@@ -62,10 +62,19 @@ proj = pathlib.Path(sys.argv[2])
 sys.path.insert(0, sys.argv[3])
 import ctx as ctxlib  # scripts/lib/ctx.py — shared token/registry/freshness helpers (v7)
 
-KNOWLEDGE = ['_gotchas.md', 'debug_patterns.md', 'security.md', 'testing.md',
-             'backend/auth.md', 'backend/database.md', 'backend/endpoints.md',
-             'frontend/components.md', 'frontend/state.md', 'frontend/routing.md',
-             'playbooks.md']
+# v9-a: einzige Quelle der Wahrheit ist knowledge.manifest.yaml (siehe
+# decisions.md#knowledge_manifest). Fallback auf die alte Liste, falls das
+# Manifest fehlt (sehr alte/fremde Installation).
+_manifest_entries = ctxlib.load_knowledge_manifest(str(ctx / "knowledge.manifest.yaml"))
+if _manifest_entries:
+    KNOWLEDGE = [e["path"] for e in _manifest_entries]
+    _marker_union = sorted({m for e in _manifest_entries for m in e["markers"]}) or ['ID', 'RULE', 'PLAYBOOK']
+else:
+    KNOWLEDGE = ['_gotchas.md', 'debug_patterns.md', 'security.md', 'testing.md',
+                 'backend/auth.md', 'backend/database.md', 'backend/endpoints.md',
+                 'frontend/components.md', 'frontend/state.md', 'frontend/routing.md',
+                 'playbooks.md']
+    _marker_union = ['ID', 'RULE', 'PLAYBOOK']
 
 results = []  # (check_id, status, fixkind, message, [details])
 
@@ -94,7 +103,7 @@ for p in context_md_files():
         all_anchors.add(m.group(1))
 
 # ============================ Check 1: Anker fehlen ========================
-block_re = re.compile(r'```[ \t]*\n(?:ID:|RULE:|PLAYBOOK:)\s*(\S+)', re.MULTILINE)
+block_re = re.compile(r'```[ \t]*\n(?:' + '|'.join(_marker_union) + r'):\s*(\S+)', re.MULTILINE)
 missing_anchor = []
 for rf in KNOWLEDGE:
     fp = ctx / rf

@@ -227,9 +227,14 @@ function parseRegistry(contextDir: string): RegistryChunk[] {
  * Chunk-Anker in den Knowledge-.md-Dateien sind aber committet: direkt
  * daraus Pseudo-Chunks bauen (ohne tags/seen/status — die kommen erst
  * mit dem ersten `ai-context-registry.sh --scan`).
- * Datei→Typ-Zuordnung identisch zur KNOWLEDGE_FILES-Liste im Registry-Scan.
+ *
+ * Datei→Typ-Zuordnung kommt seit v9-a aus knowledge.manifest.yaml (einzige
+ * Quelle der Wahrheit, siehe decisions.md#knowledge_manifest) statt aus
+ * einer hier dupliziert gepflegten Liste. Fällt das Manifest weg (sehr
+ * alte/fremde Installation), FALLBACK_KNOWLEDGE_FILES verhindert einen
+ * Totalausfall.
  */
-const KNOWLEDGE_FILES: Array<[string, string]> = [
+const FALLBACK_KNOWLEDGE_FILES: Array<[string, string]> = [
   ['_gotchas.md', 'gotcha'],
   ['debug_patterns.md', 'debug'],
   ['security.md', 'security'],
@@ -240,13 +245,52 @@ const KNOWLEDGE_FILES: Array<[string, string]> = [
   ['frontend/components.md', 'component'],
   ['frontend/state.md', 'rule'],
   ['frontend/routing.md', 'rule'],
+  ['architecture.md', 'arch'],
+  ['decisions.md', 'arch'],
   ['playbooks.md', 'playbook'],
 ];
+
+interface ManifestEntry {
+  path: string;
+  type: string;
+}
+
+/** Minimaler zeilenbasierter Parser, gleicher Stil wie parseDrawers. */
+function parseKnowledgeManifest(contextDir: string): ManifestEntry[] {
+  const p = path.join(contextDir, 'knowledge.manifest.yaml');
+  let raw = '';
+  try {
+    raw = fs.readFileSync(p, 'utf8');
+  } catch {
+    return [];
+  }
+  const entries: ManifestEntry[] = [];
+  let cur: Partial<ManifestEntry> | null = null;
+  for (const line of raw.split('\n')) {
+    const s = line.trim();
+    if (s.startsWith('- path:')) {
+      if (cur && cur.path) entries.push(cur as ManifestEntry);
+      cur = { path: s.slice(7).trim(), type: '' };
+    } else if (cur && s.startsWith('type:')) {
+      cur.type = s.slice(5).trim();
+    }
+  }
+  if (cur && cur.path) entries.push(cur as ManifestEntry);
+  return entries;
+}
+
+function knowledgeFiles(contextDir: string): Array<[string, string]> {
+  const fromManifest = parseKnowledgeManifest(contextDir);
+  if (fromManifest.length > 0) {
+    return fromManifest.map(e => [e.path, e.type]);
+  }
+  return FALLBACK_KNOWLEDGE_FILES;
+}
 
 function chunksFromMarkdownFallback(contextDir: string): RegistryChunk[] {
   const chunks: RegistryChunk[] = [];
   const anchorRe = /<!-- #(\w+) -->\n([\s\S]*?)<!-- \/\1 -->/g;
-  for (const [relFile, type] of KNOWLEDGE_FILES) {
+  for (const [relFile, type] of knowledgeFiles(contextDir)) {
     let content: string;
     try {
       content = fs.readFileSync(path.join(contextDir, relFile), 'utf8');

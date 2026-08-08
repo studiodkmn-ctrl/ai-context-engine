@@ -297,9 +297,58 @@ def list_drawer_indexes(drawers_yaml_path: str) -> list[str]:
     return indexes
 
 
+def load_knowledge_manifest(manifest_path: str) -> list[dict]:
+    """Parse knowledge.manifest.yaml (v9-a) — single source of truth for
+    which files are "knowledge files", replacing the hardcoded
+    KNOWLEDGE_FILES lists formerly duplicated in locate.ts, ai-context-
+    registry.sh, ai-context-doctor.sh and hooks/post-commit (see
+    decisions.md#knowledge_manifest).
+
+    Minimal line-based parser, same style as list_drawer_indexes — no
+    PyYAML dependency. Each entry: {path, type, markers: list[str],
+    max_entries: int|None, archive: str|None, seed: bool}.
+    """
+    p = Path(manifest_path)
+    if not p.exists():
+        return []
+    entries: list[dict] = []
+    cur: dict | None = None
+
+    def flush() -> None:
+        if cur and cur.get("path"):
+            entries.append(cur)
+
+    for line in p.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if s.startswith("- path:"):
+            flush()
+            cur = {"path": s.split(":", 1)[1].strip(), "type": "", "markers": [],
+                   "max_entries": None, "archive": None, "seed": False}
+            continue
+        if cur is None:
+            continue
+        if s.startswith("type:"):
+            cur["type"] = s.split(":", 1)[1].strip()
+        elif s.startswith("markers:"):
+            raw = s.split(":", 1)[1].strip().strip("[]")
+            cur["markers"] = [m.strip() for m in raw.split(",") if m.strip()]
+        elif s.startswith("max_entries:"):
+            try:
+                cur["max_entries"] = int(s.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+        elif s.startswith("archive:"):
+            cur["archive"] = s.split(":", 1)[1].strip()
+        elif s.startswith("seed:"):
+            cur["seed"] = s.split(":", 1)[1].strip().lower() == "true"
+    flush()
+    return entries
+
+
 def _main(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("Usage: ctx.py <count_tokens|extract_chunk|git_last_touched|list_drawer_indexes> ...", file=sys.stderr)
+        print("Usage: ctx.py <count_tokens|extract_chunk|git_last_touched|"
+              "list_drawer_indexes|list_knowledge_files> ...", file=sys.stderr)
         return 1
     cmd = argv[1]
     if cmd == "count_tokens":
@@ -320,6 +369,15 @@ def _main(argv: list[str]) -> int:
             return 1
         for idx in list_drawer_indexes(argv[2]):
             print(idx)
+    elif cmd == "list_knowledge_files":
+        if len(argv) < 3:
+            print("Usage: ctx.py list_knowledge_files <manifest.yaml> [--seed-only]", file=sys.stderr)
+            return 1
+        seed_only = "--seed-only" in argv[3:]
+        for entry in load_knowledge_manifest(argv[2]):
+            if seed_only and not entry["seed"]:
+                continue
+            print(entry["path"])
     else:
         print(f"Unknown command: {cmd}", file=sys.stderr)
         return 1

@@ -14,15 +14,18 @@ PLAYBOOK: add_knowledge_file
 P: 2
 trigger: neue wissensdatei, neue schublade, playbook hinzufügen, gotcha-artige datei
 steps:
-  1. Datei im Anchor-Block-Format anlegen (wie _gotchas.md).
-  2. mcp/src/lib/locate.ts::KNOWLEDGE_FILES eintragen (Fallback ohne registry.yaml).
-  3. ai-context-registry.sh::KNOWLEDGE_FILES eintragen (Freshness beim --scan).
-  4. ai-context-doctor.sh an allen Stellen ergänzen, wo _gotchas.md/
-     debug_patterns.md/security.md gelistet sind (per grep suchen, nicht raten).
-  5. hooks/post-commit::knowledge_files-Dict mit Limit ergänzen (Priority-Trim).
-  6. Alle Schritte identisch im _ai_context_template/-Pendant nachziehen.
-  7. CLAUDE.md-Writeback-Tabelle um eine Zeile ergänzen.
-learned_from: Session 2026-08-08 (dogfooding — playbooks.md selbst so gebaut)
+  1. Zeile in knowledge.manifest.yaml ergänzen (_ai_context/ UND
+     _ai_context_template/ — identischer Inhalt, kein Stack-spezifisches
+     Feld wie bei drawers.yaml): path, type, markers, optional
+     max_entries/archive/seed. Datei im Anchor-Block-Format anlegen (wie
+     _gotchas.md), falls sie noch nicht existiert.
+  2. Fertig — locate.ts, ai-context-registry.sh, ai-context-doctor.sh,
+     hooks/post-commit und migrate.sh lesen alle aus dem Manifest (v9-a,
+     siehe decisions.md#knowledge_manifest). Bei seed:true legt migrate.sh
+     die Datei in bestehenden Projekten automatisch additiv an.
+learned_from: Session 2026-08-08 (v9-a — Manifest-Umbau ersetzt die
+  ursprünglichen 7 manuellen Schritte, mit denen dieses Playbook selbst
+  zuerst angelegt wurde)
 ```
 <!-- /add_knowledge_file -->
 

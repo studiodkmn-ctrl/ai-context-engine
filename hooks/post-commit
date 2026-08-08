@@ -265,13 +265,26 @@ fi
 python3 << 'PYEOF'
 import re, pathlib, sys
 
-ctx = pathlib.Path("./_ai_context")
-if not ctx.exists():
+ctx_dir = pathlib.Path("./_ai_context")
+if not ctx_dir.exists():
     sys.exit(0)
 
-# Wissensdateien mit Eintragslimits
-# Format: Einträge sind ``` ... ``` Blöcke mit ID: oder RULE: als erste Zeile darin
-knowledge_files = {"_gotchas.md": 15, "debug_patterns.md": 15, "security.md": 10, "testing.md": 10, "playbooks.md": 15}
+# v9-a: Wissensdateien + Limits kommen aus knowledge.manifest.yaml (einzige
+# Quelle der Wahrheit, siehe decisions.md#knowledge_manifest) statt einem
+# hier dupliziert gepflegten Dict. Fallback falls das Manifest fehlt.
+sys.path.insert(0, str(ctx_dir / "scripts" / "lib"))
+try:
+    import ctx as ctxlib
+    _manifest_entries = ctxlib.load_knowledge_manifest(str(ctx_dir / "knowledge.manifest.yaml"))
+except Exception:
+    _manifest_entries = []
+
+if _manifest_entries:
+    knowledge_files = {e["path"]: e["max_entries"] for e in _manifest_entries if e["max_entries"]}
+    _marker_union = sorted({m for e in _manifest_entries for m in e["markers"]}) or ["ID", "RULE", "PLAYBOOK"]
+else:
+    knowledge_files = {"_gotchas.md": 15, "debug_patterns.md": 15, "security.md": 10, "testing.md": 10, "playbooks.md": 15}
+    _marker_union = ["ID", "RULE", "PLAYBOOK"]
 
 def get_priority(block_text):
     """Lese P: Feld aus einem Eintrag. Default: 2 (rückwärtskompatibel)."""
@@ -280,9 +293,8 @@ def get_priority(block_text):
 
 def priority_trim(content, max_entries, fname):
     """Trimmt Einträge nach Priorität: P3 zuerst, dann P2. P1 niemals löschen."""
-    # Finde Header (alles vor dem ersten ``` Block mit ID:/RULE:)
-    # Eintrag-Format: ``` \nID: ... \n ... ```  oder  ``` \nRULE: ... \n ... ```
-    block_pattern = re.compile(r'```\s*\n(?:ID:|RULE:|PLAYBOOK:)[\s\S]*?```', re.MULTILINE)
+    # Finde Header (alles vor dem ersten ``` Block mit ID:/RULE:/PLAYBOOK:)
+    block_pattern = re.compile(r'```\s*\n(?:' + '|'.join(_marker_union) + r'):[\s\S]*?```', re.MULTILINE)
     entries = block_pattern.findall(content)
 
     if len(entries) <= max_entries:
@@ -316,7 +328,7 @@ def priority_trim(content, max_entries, fname):
     return new_content, removed
 
 for fname, max_entries in knowledge_files.items():
-    fpath = ctx / fname
+    fpath = ctx_dir / fname
     if not fpath.exists():
         continue
     content = fpath.read_text(encoding="utf-8")
@@ -326,7 +338,7 @@ for fname, max_entries in knowledge_files.items():
         print(f"  Trim {fname}: {removed} P3/P2-Einträge entfernt (P1 erhalten)")
 
 # _temp_notes.md: Recent Changes max 5 (unverändert)
-temp_path = ctx / "_temp_notes.md"
+temp_path = ctx_dir / "_temp_notes.md"
 if temp_path.exists():
     content = temp_path.read_text(encoding="utf-8")
     lines = content.splitlines()

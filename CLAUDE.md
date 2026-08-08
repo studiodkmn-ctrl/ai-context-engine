@@ -23,6 +23,8 @@ Ziel-Datei per Schublade bestimmen: siehe _ai_context/drawers.yaml
 (ui_controls/api/auth/data/state/infra → jeweilige index:-Datei).
 Playbook (wiederkehrende Aufgabe, >3 Schritte, Rezept statt Fakt)
   → playbooks.md (PLAYBOOK:-Block, gleiches Format wie _gotchas.md)
+Neue Wissensdatei? → _ai_context/knowledge.manifest.yaml, nicht einzeln
+  verdrahten (siehe playbooks.md#add_knowledge_file).
 Vor neuem Eintrag: bash _ai_context/check_context_hash.sh --dedup <datei>
   → DUPLICATE:id → bestehenden Eintrag updaten statt neu anlegen
 Code-Format (→ ✗ ✓ ? @ ⇒), P: 1=kritisch 2=wichtig 3=nice-to-know,

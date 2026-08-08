@@ -57,21 +57,29 @@ old_registry_by_id = {
     c["id"]: c for c in ctxlib.parse_registry(str(ctx_dir / "registry.yaml"))["chunks"]
 }
 
-KNOWLEDGE_FILES = [
-    ("_gotchas.md",            "gotcha"),
-    ("debug_patterns.md",      "debug"),
-    ("security.md",            "security"),
-    ("testing.md",             "rule"),
-    ("backend/auth.md",        "rule"),
-    ("backend/database.md",    "rule"),
-    ("backend/endpoints.md",   "endpoint"),
-    ("frontend/components.md", "component"),
-    ("frontend/state.md",      "rule"),
-    ("frontend/routing.md",    "rule"),
-    ("architecture.md",        "arch"),
-    ("decisions.md",           "arch"),
-    ("playbooks.md",           "playbook"),
-]
+# v9-a: einzige Quelle der Wahrheit ist knowledge.manifest.yaml (siehe
+# decisions.md#knowledge_manifest) statt einer hier dupliziert gepflegten
+# Liste. Fallback auf die alte hartcodierte Liste, falls das Manifest fehlt
+# (sehr alte/fremde Installation) — verhindert einen Totalausfall.
+_manifest_entries = ctxlib.load_knowledge_manifest(str(ctx_dir / "knowledge.manifest.yaml"))
+if _manifest_entries:
+    KNOWLEDGE_FILES = [(e["path"], e["type"]) for e in _manifest_entries]
+else:
+    KNOWLEDGE_FILES = [
+        ("_gotchas.md",            "gotcha"),
+        ("debug_patterns.md",      "debug"),
+        ("security.md",            "security"),
+        ("testing.md",             "rule"),
+        ("backend/auth.md",        "rule"),
+        ("backend/database.md",    "rule"),
+        ("backend/endpoints.md",   "endpoint"),
+        ("frontend/components.md", "component"),
+        ("frontend/state.md",      "rule"),
+        ("frontend/routing.md",    "rule"),
+        ("architecture.md",        "arch"),
+        ("decisions.md",           "arch"),
+        ("playbooks.md",           "playbook"),
+    ]
 
 # STOPWORDS + Token-Schätzung + Tag-Extraktion leben jetzt in scripts/lib/ctx.py
 # (v7 — vorher hier + check_context_hash.sh + ai-session-prep.sh dupliziert).
@@ -239,30 +247,62 @@ if [ "${1:-}" = "--add-anchors" ]; then
     fi
   else
     TARGET_FILES=()
-    for f in "_gotchas.md" "debug_patterns.md" "security.md" "testing.md" \
-             "backend/auth.md" "backend/database.md" "backend/endpoints.md" \
-             "frontend/components.md" "frontend/state.md" "frontend/routing.md" \
-             "playbooks.md"; do
+    # v9-a: Dateiliste kommt aus knowledge.manifest.yaml (einzige Quelle der
+    # Wahrheit) statt einer hier hartcodierten Liste. Fallback falls das
+    # Manifest fehlt (sehr alte/fremde Installation).
+    MANIFEST="$CONTEXT_DIR/knowledge.manifest.yaml"
+    KNOWLEDGE_LIST=()
+    if [ -f "$MANIFEST" ]; then
+      while IFS= read -r line; do
+        [ -n "$line" ] && KNOWLEDGE_LIST+=("$line")
+      done < <(python3 "$SCRIPT_DIR/lib/ctx.py" list_knowledge_files "$MANIFEST" 2>/dev/null)
+    fi
+    if [ ${#KNOWLEDGE_LIST[@]} -eq 0 ]; then
+      KNOWLEDGE_LIST=("_gotchas.md" "debug_patterns.md" "security.md" "testing.md" \
+        "backend/auth.md" "backend/database.md" "backend/endpoints.md" \
+        "frontend/components.md" "frontend/state.md" "frontend/routing.md" \
+        "architecture.md" "decisions.md" "playbooks.md")
+    fi
+    for f in "${KNOWLEDGE_LIST[@]}"; do
       [ -f "$CONTEXT_DIR/$f" ] && TARGET_FILES+=("$CONTEXT_DIR/$f")
     done
   fi
 
   TOTAL_INJECTED=0
 
+  # v9-a: Marker-Vereinigung aus dem Manifest statt hartcodiert (jede Datei
+  # nutzt ohnehin nur ihre eigenen Marker, eine globale Vereinigung ist
+  # unschädlich und spart pro-Datei-Regex-Komplexität — siehe Plan).
+  MARKER_UNION="ID|RULE|PLAYBOOK"
+  if [ -f "$MANIFEST" ]; then
+    _mu=$(python3 - "$MANIFEST" "$SCRIPT_DIR/lib" << 'PYEOF' 2>/dev/null
+import sys
+sys.path.insert(0, sys.argv[2])
+import ctx as ctxlib
+markers = set()
+for e in ctxlib.load_knowledge_manifest(sys.argv[1]):
+    markers.update(e["markers"])
+print("|".join(sorted(markers)))
+PYEOF
+)
+    [ -n "$_mu" ] && MARKER_UNION="$_mu"
+  fi
+
   for ABS_FILE in "${TARGET_FILES[@]}"; do
-    INJECTED=$(python3 - "$ABS_FILE" 2>/dev/null << 'PYEOF'
+    INJECTED=$(python3 - "$ABS_FILE" "$MARKER_UNION" 2>/dev/null << 'PYEOF'
 import re, pathlib, sys
 
 path = pathlib.Path(sys.argv[1])
+marker_union = sys.argv[2]
 if not path.exists():
     print(0)
     sys.exit(0)
 
 content = path.read_text(encoding='utf-8')
 
-# Match code-fence blocks mit ID:/RULE:/PLAYBOOK: als erste Zeile
+# Match code-fence blocks mit ID:/RULE:/PLAYBOOK: (oder Manifest-Marker) als erste Zeile
 block_re = re.compile(
-    r'(```[ \t]*\n)((?:ID:|RULE:|PLAYBOOK:)\s*(\S+)[^\n]*\n[\s\S]*?)(```)',
+    r'(```[ \t]*\n)((?:' + marker_union + r'):\s*(\S+)[^\n]*\n[\s\S]*?)(```)',
     re.MULTILINE
 )
 

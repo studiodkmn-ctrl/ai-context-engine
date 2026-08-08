@@ -1,0 +1,67 @@
+# knowledge.manifest.yaml — einzige Quelle der Wahrheit für Wissensdateien (v9-a)
+#
+# locate.ts, ai-context-registry.sh, ai-context-doctor.sh, hooks/post-commit
+# und migrate.sh lesen ALLE aus dieser Liste statt eigene Kopien zu pflegen.
+# Neue Wissensdatei anlegen? → hier eine Zeile ergänzen (Projekt + Template),
+# nicht mehr an den einzelnen Scripts. Siehe playbooks.md#add_knowledge_file.
+#
+# Felder:
+#   path         relativ zu _ai_context/
+#   type         Chunk-Typ für locate()/registry (gotcha|debug|security|rule|
+#                endpoint|component|arch|playbook)
+#   markers      welche Block-Präfixe (ID:/RULE:/PLAYBOOK:) diese Datei nutzt
+#   max_entries  optional — nur bei Prioritäts-getrimmten Dateien (P1/P2/P3)
+#   archive      optional — Ziel-Archivdatei bei Overflow (nur mit max_entries)
+#   seed         optional (default false) — migrate.sh legt die Datei additiv
+#                aus dem Template an, wenn sie in einem bestehenden Projekt
+#                fehlt. NIE bei Kern-Dateien (_gotchas.md etc.) setzen — die
+#                bleiben laut migrate.sh-Kopfkommentar bewusst unangetastet.
+version: "1.0"
+files:
+  - path: _gotchas.md
+    type: gotcha
+    markers: [ID, RULE]
+    max_entries: 15
+    archive: _gotchas_archive.md
+  - path: debug_patterns.md
+    type: debug
+    markers: [ID, RULE]
+    max_entries: 15
+    archive: _debug_patterns_archive.md
+  - path: security.md
+    type: security
+    markers: [ID, RULE]
+    max_entries: 10
+  - path: testing.md
+    type: rule
+    markers: [ID, RULE]
+    max_entries: 10
+  - path: backend/auth.md
+    type: rule
+    markers: [ID, RULE]
+  - path: backend/database.md
+    type: rule
+    markers: [ID, RULE]
+  - path: backend/endpoints.md
+    type: endpoint
+    markers: [ID, RULE]
+  - path: frontend/components.md
+    type: component
+    markers: [ID, RULE]
+  - path: frontend/state.md
+    type: rule
+    markers: [ID, RULE]
+  - path: frontend/routing.md
+    type: rule
+    markers: [ID, RULE]
+  - path: architecture.md
+    type: arch
+    markers: [ID, RULE]
+  - path: decisions.md
+    type: arch
+    markers: [ID, RULE]
+  - path: playbooks.md
+    type: playbook
+    markers: [PLAYBOOK]
+    max_entries: 15
+    seed: true

@@ -16,6 +16,8 @@
 #      Component-Datei
 #   6. post-commit invalidiert nach einer API-Änderung backend/endpoints.md
 #      wirklich (Wirkung, nicht nur fehlerfreier Durchlauf)
+#   7. knowledge.manifest.yaml (v9-a): seed:true-Dateien existieren nach
+#      Setup UND tauchen nach Löschen + erneuter Migration wieder auf
 #
 # Aufruf (aus dem Engine-Repo oder via CI):
 #   bash _ai_context_template/scripts/ai-verify-self.sh
@@ -202,6 +204,57 @@ else
       echo -e "  ${RED}✗${NC} post-commit: Status wurde nicht invalidiert"
       echo "      vorher:  $BEFORE_ROW"
       echo "      nachher: $AFTER_ROW"
+      FAILS=$((FAILS + 1))
+    fi
+  fi
+fi
+
+# ---- 7. Manifest-Parität: seed:true-Dateien überstehen eine Migration ----
+# Regression v8.1: playbooks.md war zunächst hartcodiert in migrate.sh
+# verdrahtet und wurde dort vergessen — 9 Projekte liefen wochenlang ohne
+# sie, bis ein manueller Test es zeigte. v9-a macht das generisch über
+# knowledge.manifest.yaml; dieser Check beweist, dass die Fehlerklasse
+# nicht wiederkommen kann: seed-Dateien müssen nach Setup existieren UND
+# nach Löschen + erneuter Migration wieder auftauchen.
+MANIFEST="_ai_context/knowledge.manifest.yaml"
+CTX_PY="_ai_context/scripts/lib/ctx.py"
+if [ ! -f "$MANIFEST" ] || [ ! -f "$CTX_PY" ]; then
+  echo -e "  ${YELLOW}⚠${NC} manifest: knowledge.manifest.yaml oder ctx.py fehlt — übersprungen"
+  FAILS=$((FAILS + 1))
+else
+  SEED_FILES="$(python3 "$CTX_PY" list_knowledge_files "$MANIFEST" --seed-only 2>/dev/null)"
+  if [ -z "$SEED_FILES" ]; then
+    echo -e "  ${YELLOW}⚠${NC} manifest: keine seed:true-Einträge — Test aussagelos"
+    FAILS=$((FAILS + 1))
+  else
+    ALL_PRESENT=true
+    while IFS= read -r sf; do
+      [ -z "$sf" ] && continue
+      [ -f "_ai_context/$sf" ] || ALL_PRESENT=false
+    done <<< "$SEED_FILES"
+    if $ALL_PRESENT; then
+      echo -e "  ${GREEN}✓${NC} manifest: alle seed:true-Dateien nach Setup vorhanden"
+    else
+      echo -e "  ${RED}✗${NC} manifest: mindestens eine seed:true-Datei fehlt nach Setup"
+      FAILS=$((FAILS + 1))
+    fi
+
+    # Löschen + Migration erneut laufen lassen → müssen wieder auftauchen
+    while IFS= read -r sf; do
+      [ -z "$sf" ] && continue
+      rm -f "_ai_context/$sf"
+    done <<< "$SEED_FILES"
+    bash "$ENGINE_ROOT/migrate.sh" > "$SANDBOX/migrate-reseed.log" 2>&1 || true
+    RESEEDED=true
+    while IFS= read -r sf; do
+      [ -z "$sf" ] && continue
+      [ -f "_ai_context/$sf" ] || RESEEDED=false
+    done <<< "$SEED_FILES"
+    if $RESEEDED; then
+      echo -e "  ${GREEN}✓${NC} manifest: seed:true-Dateien nach Re-Migration wiederhergestellt"
+    else
+      echo -e "  ${RED}✗${NC} manifest: seed:true-Dateien NICHT wiederhergestellt — Log:"
+      tail -10 "$SANDBOX/migrate-reseed.log" | sed 's/^/      /'
       FAILS=$((FAILS + 1))
     fi
   fi

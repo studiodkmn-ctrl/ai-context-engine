@@ -289,6 +289,13 @@ if [ -f "$TEMPLATE_DIR/check_context_hash.sh" ]; then
   chmod +x "$CONTEXT_DIR/check_context_hash.sh"
 fi
 
+# v9-a: knowledge.manifest.yaml — einzige Quelle der Wahrheit für Wissens-
+# dateien (siehe decisions.md#knowledge_manifest). Kein *.md, daher vom
+# obigen find-Loop nicht erfasst — expliziter Copy wie check_context_hash.sh.
+if [ -f "$TEMPLATE_DIR/knowledge.manifest.yaml" ]; then
+  cp "$TEMPLATE_DIR/knowledge.manifest.yaml" "$CONTEXT_DIR/"
+fi
+
 # ---- drawers.yaml (v7 Schubladen-Manifest) — aus erkannter Projektstruktur ----
 # Wandelt einen Auto-detect-Pfad (Verzeichnis oder Datei) in ein Glob-Pattern:
 #   "src/components/" -> "src/components/**" (Verzeichnis, Trailing-Slash)

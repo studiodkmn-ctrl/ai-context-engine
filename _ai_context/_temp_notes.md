@@ -48,3 +48,5 @@ Due:           -
 - Intent: feat(v9-b): ai-prompt-router.sh — locate() ohne Kommando  (2026-08-08) <!-- hash:d4dd6aa78c3b -->
 
 - Testfakt SMOKE-1786222235632: stdio MCP funktioniert  (2026-08-08) <!-- hash:5de7090ded07 -->
+
+- Intent: feat(v9-c): ai-session-reflect.sh — automatisches Lernen (Stop/PreCompact)  (2026-08-08) <!-- hash:ad231a728a52 -->

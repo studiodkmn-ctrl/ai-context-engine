@@ -44,3 +44,5 @@ Due:           -
 - Intent: feat(v9-a): knowledge.manifest.yaml — einzige Quelle für Wissensdateien  (2026-08-08) <!-- hash:e4dee2157e61 -->
 
 - Testfakt SMOKE-1786220826620: stdio MCP funktioniert  (2026-08-08) <!-- hash:1c7f18e0792b -->
+
+- Intent: feat(v9-b): ai-prompt-router.sh — locate() ohne Kommando  (2026-08-08) <!-- hash:d4dd6aa78c3b -->

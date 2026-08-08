@@ -120,6 +120,15 @@ if [ -d "$SRC_TEMPLATE/scripts/lib" ]; then
   echo -e "   ✅ scripts/lib/ (ctx.py, synonyms.txt)"
 fi
 
+# v8.1: playbooks.md (prozedurales Gedächtnis) — additiv wie hot_paths.md/
+# drawers.yaml: nur anlegen wenn noch nicht vorhanden, NIE überschreiben
+# (sonst gingen projekteigene Playbook-Einträge bei jeder Migration verloren).
+if [ ! -f "_ai_context/playbooks.md" ] && [ -f "$SRC_TEMPLATE/playbooks.md" ]; then
+  PROJECT_NAME_PB="$(basename "$(pwd)")"
+  sed "s/\[PROJECT_NAME\]/$PROJECT_NAME_PB/g" "$SRC_TEMPLATE/playbooks.md" > "_ai_context/playbooks.md"
+  echo -e "   ✅ _ai_context/playbooks.md angelegt (prozedurales Gedächtnis)"
+fi
+
 # ctx.py erzeugt bei jedem Aufruf __pycache__/ — ohne .gitignore-Eintrag
 # landet das sonst versehentlich im nächsten Commit.
 if [ -f ".gitignore" ] && ! grep -q "__pycache__" ".gitignore" 2>/dev/null; then
@@ -214,11 +223,12 @@ SESSION_CMD="[ -f _ai_context/scripts/ai-session-prep.sh ] && bash _ai_context/s
 CAT_SESSION_CMD="cat _ai_context/_SESSION.md 2>/dev/null || true"
 PII_CMD="if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hooks/pii-warn.sh; fi"
 SELFCHECK_CMD="if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi"
+READGUARD_CMD="[ -f _ai_context/scripts/ai-read-guard.sh ] && bash _ai_context/scripts/ai-read-guard.sh || true"
 
 mkdir -p ".claude"
 
 if command -v python3 &>/dev/null; then
-  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" << 'PYEOF'
+  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" "$READGUARD_CMD" << 'PYEOF'
 import json, sys, pathlib
 
 path      = pathlib.Path(sys.argv[1])
@@ -227,6 +237,7 @@ session_cmd = sys.argv[3]
 pii_cmd     = sys.argv[4]
 cat_session_cmd = sys.argv[5]
 selfcheck_cmd   = sys.argv[6]
+readguard_cmd   = sys.argv[7]
 
 if path.exists():
     try:
@@ -308,6 +319,19 @@ if not has_pii:
     print("   ✅ UserPromptSubmit: pii-warn.sh hinzugefügt")
 else:
     print("   ✅ UserPromptSubmit: pii-warn.sh bereits vorhanden")
+
+# ---- v8.1: PreToolUse — Duplicate-Read-Guard ----
+rg_groups = hooks.setdefault("PreToolUse", [])
+has_readguard = any(
+    any("ai-read-guard" in h.get("command", "") for h in g.get("hooks", []))
+    for g in rg_groups
+)
+if not has_readguard:
+    rg_groups.append({"matcher": "Read", "hooks": [{"type": "command", "command": readguard_cmd}]})
+    changed = True
+    print("   ✅ PreToolUse: ai-read-guard.sh hinzugefügt")
+else:
+    print("   ✅ PreToolUse: ai-read-guard.sh bereits vorhanden")
 
 if changed:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')

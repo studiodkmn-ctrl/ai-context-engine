@@ -1,0 +1,29 @@
+# bench/tasks.yaml — Aufgaben fuer ai-bench.sh (v9-d)
+#
+# Jede Task wird zweimal headless ausgefuehrt: Arm A (Projekt wie es ist,
+# mit _ai_context/) und Arm B (gleiche Kopie ohne _ai_context/, CLAUDE.md,
+# .claude/, hooks/). Grading ist rein keyword-basiert: pro Eintrag in
+# expect_any_of_each muss MINDESTENS ein Keyword (case-insensitive) in der
+# Antwort vorkommen, damit diese Gruppe als "gefunden" zaehlt.
+tasks:
+  - id: fixture_5bugs
+    project: /Users/adnandikmen/Desktop/kontext-token/test-projekt
+    prompt: >-
+      Finde alle Sicherheits- und Performance-Bugs in diesem Projekt
+      (Next.js/Prisma). Liste jeden Bug mit exaktem Dateipfad und einem
+      Satz Beschreibung.
+    expect_any_of_each:
+      - ["admin/route.ts"]
+      - ["db.ts"]
+      - ["auth.ts"]
+      - ["users/route.ts", "posts/route.ts", "login/route.ts"]
+      - ["userid", "scope"]
+
+  - id: locate_read_guard
+    project: /Users/adnandikmen/Desktop/kontext-token/ai-context-engine
+    prompt: >-
+      Wo genau ist der Duplicate-Read-Guard implementiert und welcher
+      Hook-Typ ruft ihn auf? Antworte in 2-3 Saetzen mit Dateipfad.
+    expect_any_of_each:
+      - ["ai-read-guard.sh"]
+      - ["pretooluse"]

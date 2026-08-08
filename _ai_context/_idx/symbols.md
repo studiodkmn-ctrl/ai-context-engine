@@ -1,5 +1,5 @@
 # Symbol Map — ai-context-engine
-> Auto-generiert: 2026-08-06 05:20 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> Auto-generiert: 2026-08-08 19:34 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
 > 12 Dateien · 85 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `context_manager_agent.py`
@@ -43,20 +43,20 @@
   parseInteractionMap                 L134   
   scoreMapRow                         L159   
   parseRegistry                       L187   
-  chunksFromMarkdownFallback          L245   
-  extractChunkBody                    L269   
-  escapeRe                            L282   
-  symptomLine                         L286   
-  extractAtFiles                      L292     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
-  scoreChunk                          L298   
-  freshnessNote                       L306   
-  parseSymbols                        L321   
-  parseInterfaces                     L357   
-  parseInvariants                     L386   
-  parseImpactGraph                    L416     — ------------------------------------------------------------
-  locateQuery                         L446   
-  boost                               L486     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
-  addFile                             L598   
+  chunksFromMarkdownFallback          L246   
+  extractChunkBody                    L270   
+  escapeRe                            L283   
+  symptomLine                         L287   
+  extractAtFiles                      L293     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
+  scoreChunk                          L299   
+  freshnessNote                       L307   
+  parseSymbols                        L322   
+  parseInterfaces                     L358   
+  parseInvariants                     L387   
+  parseImpactGraph                    L417     — ------------------------------------------------------------
+  locateQuery                         L447   
+  boost                               L487     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
+  addFile                             L611   
 ## `mcp/src/lib/paths.ts`
   findProjectRoot                     L9     
   localContextDir                     L23      — Pfad zum projektlokalen `_ai_context`-Ordner.
@@ -67,8 +67,8 @@
   getProjectId                        L18    
   readGitOrigin                       L41    
 ## `mcp/src/lib/save.ts`
-  contentHash                         L34    
-  saveFact                            L43    
+  contentHash                         L36    
+  saveFact                            L45    
 ## `mcp/src/lib/search.ts`
   collectMarkdown                     L18      — Sammelt rekursiv alle Markdown-Dateien unterhalb von `dir`.
   splitBlocks                         L37      — Zerlegt Markdown in Blöcke (an Überschriften und Leerzeilen)

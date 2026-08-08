@@ -73,6 +73,30 @@ locateRes.includes('silent_noop_needs_effect_test')
   ? pass('locate findet silent_noop_needs_effect_test')
   : fail('locate fand silent_noop_needs_effect_test nicht: ' + locateRes);
 
+// 5c) Injektions-Schwelle (V10 R2) — der Prompt-Router laeuft bei JEDEM
+// Prompt. Faellt die Schwelle zurueck auf "ein Treffer genuegt", injiziert
+// er wieder Rauschen in generische Prompts. Wirkung testen, nicht Durchlauf
+// (⇒ _gotchas.md#silent_noop_needs_effect_test).
+const { execFileSync } = await import('node:child_process');
+const cliPath = path.join(__dirname, '..', 'dist', 'locate-cli.js');
+const runCli = (args) => {
+  try {
+    return execFileSync('node', [cliPath, ...args], {
+      encoding: 'utf8', cwd: projectRoot, timeout: 15000,
+    });
+  } catch { return ''; }
+};
+
+const noiseOut = runCli(['--strict', 'weiter mit naechste phase']);
+noiseOut.includes('Kein Index-Treffer')
+  ? pass('--strict bleibt bei generischem Prompt still')
+  : fail('--strict injizierte bei generischem Prompt: ' + noiseOut);
+
+const realOut = runCli(['--strict', 'hook laeuft fehlerfrei durch bewirkt aber nichts']);
+realOut.includes('silent_noop_needs_effect_test')
+  ? pass('--strict trifft weiterhin bei echtem Symptom')
+  : fail('--strict fand echtes Symptom nicht: ' + realOut);
+
 // 6) capture_from_diff (nur Vorschlag-Modus, darf auch leer sein)
 const cap = await callText('capture_from_diff', {});
 console.log('\n[capture_from_diff]\n' + cap.slice(0, 200));

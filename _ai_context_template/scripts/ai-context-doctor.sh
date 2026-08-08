@@ -21,6 +21,8 @@
 #   bash ai-context-doctor.sh            # --check: Health-Report (exit 0/1)
 #   bash ai-context-doctor.sh --fix      # mechanische Defekte reparieren
 #   bash ai-context-doctor.sh --session  # still fixen, EINE Zeile (SessionStart)
+#   bash ai-context-doctor.sh --ack <id> # Warnung dauerhaft akzeptieren
+#   bash ai-context-doctor.sh --unack <id>
 #
 # v8: mechanische Fixes sind Standard (kein Pro-Gate mehr) — sie sind rein
 # strukturell (Anker, Map, Session-Refresh, Orphan-Archivierung) und
@@ -42,12 +44,30 @@ ORPHAN_DAYS="${AI_CTX_ORPHAN_DAYS:-30}"
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RED='\033[0;31m'; NC='\033[0m'
 
 MODE="check"
+ACK_TARGET=""
 case "${1:-}" in
   --fix)     MODE="fix" ;;
   --session) MODE="session" ;;
   --check|"") MODE="check" ;;
-  *) echo "Usage: ai-context-doctor.sh [--check|--fix|--session]" >&2; exit 2 ;;
+  --ack)     MODE="ack";   ACK_TARGET="${2:-}" ;;
+  --unack)   MODE="unack"; ACK_TARGET="${2:-}" ;;
+  *) echo "Usage: ai-context-doctor.sh [--check|--fix|--session|--ack <id>|--unack <id>]" >&2; exit 2 ;;
 esac
+
+# ---- Bestätigte Warnungen (V10 R1b) ----------------------------------------
+# Manche Warnungen sind dauerhaft und bewusst so: ein Projekt, das die
+# Demo-Regeln legitim übernommen hat (demo_content), eine auto-generierte
+# Datei, die immer groß ist (oversize/_idx). Ohne Quittier-Möglichkeit
+# meldet der SessionStart-Hook sie in JEDER Session — und eine Warnung, die
+# immer da ist, liest bald niemand mehr. Bestätigte Checks bleiben im
+# vollen --check-Report sichtbar (als "bestätigt" markiert), zählen aber
+# nicht mehr als offener Punkt und schweigen in --session.
+ACK_FILE="$CONTEXT_DIR/.doctor-ack"
+
+is_acked() {  # is_acked <check-id>
+  [ -f "$ACK_FILE" ] || return 1
+  grep -qE "^[[:space:]]*$1[[:space:]]*(#.*)?$" "$ACK_FILE" 2>/dev/null
+}
 
 CHECKER="$(mktemp -t aictx-doctor.XXXXXX.py)"
 REPORT="$(mktemp -t aictx-doctor.XXXXXX.txt)"
@@ -85,7 +105,10 @@ def context_md_files():
     for p in sorted(ctx.rglob('*.md')):
         if p.name == '_SESSION.md':
             continue
-        if '_cache' in p.parts:
+        # _cache/ und .session/ sind transienter Laufzeit-Zustand (Read-Guard-
+        # Ledger, reflect-inbox), kein gepflegtes Wissen — sie hier mitzupruefen
+        # meldet z.B. eine wachsende reflect-inbox als "zu grosse Wissensdatei".
+        if '_cache' in p.parts or '.session' in p.parts:
             continue
         yield p
 
@@ -726,8 +749,15 @@ count_status() {
   awk -F'|' -v st="$1" '$1=="CHECK" && $3==st {n++} END{print n+0}' "$REPORT"
 }
 count_fixkind_warn() {
-  awk -F'|' -v fk="$1" \
-    '$1=="CHECK" && $3=="WARN" && $4==fk {n++} END{print n+0}' "$REPORT"
+  # Bestätigte Checks (.doctor-ack) zählen nicht als offener Punkt —
+  # sonst bleibt der SessionStart-Hinweis dauerhaft stehen.
+  local total=0 cid
+  while IFS='|' read -r tag cid status fixkind _rest; do
+    [ "$tag" = "CHECK" ] && [ "$status" = "WARN" ] && [ "$fixkind" = "$1" ] || continue
+    is_acked "$cid" && continue
+    total=$((total + 1))
+  done < "$REPORT"
+  printf '%s' "$total"
 }
 
 # ---- Report formatieren ----
@@ -737,6 +767,11 @@ print_report() {
   # shellcheck disable=SC2034  # fixkind = Platzhalter der IFS-Spaltung (Feld 4)
   while IFS='|' read -r tag cid status fixkind msg; do
     [ "$tag" = "CHECK" ] || continue
+    if [ "$status" != "PASS" ] && is_acked "$cid"; then
+      # Bestätigt: sichtbar, aber als erledigt markiert und ohne Details.
+      echo -e "  ${CYAN}[ ok ]${NC} ${cid} — ${msg} ${CYAN}(bestätigt)${NC}"
+      continue
+    fi
     case "$status" in
       PASS) echo -e "  ${GREEN}[PASS]${NC} ${cid} — ${msg}" ;;
       WARN) echo -e "  ${YELLOW}[WARN]${NC} ${cid} — ${msg}" ;;
@@ -745,12 +780,49 @@ print_report() {
     if [ "$status" != "PASS" ]; then
       grep "^DETAIL|${cid}|" "$REPORT" | sed 's/^DETAIL|[^|]*|/         /' \
         | head -6
+      echo -e "         ${CYAN}dauerhaft so gewollt?${NC} bash _ai_context/scripts/ai-context-doctor.sh --ack ${cid}"
     fi
   done < "$REPORT"
 }
 
 # ===========================================================================
 case "$MODE" in
+
+  ack)
+    if [ -z "$ACK_TARGET" ]; then
+      echo "Usage: ai-context-doctor.sh --ack <check-id>" >&2; exit 2
+    fi
+    if is_acked "$ACK_TARGET"; then
+      echo -e "${CYAN}'$ACK_TARGET' war bereits bestätigt.${NC}"
+      exit 0
+    fi
+    if [ ! -f "$ACK_FILE" ]; then
+      cat > "$ACK_FILE" << 'ACKEOF'
+# .doctor-ack — bewusst akzeptierte Doctor-Warnungen
+# Eine Check-ID pro Zeile. Bestätigte Checks bleiben im vollen Report
+# sichtbar (als "bestätigt"), zählen aber nicht als offener Punkt und
+# lösen keinen SessionStart-Hinweis mehr aus.
+# Rückgängig: ai-context-doctor.sh --unack <check-id>
+ACKEOF
+    fi
+    printf '%s   # bestätigt am %s\n' "$ACK_TARGET" "$(date +%Y-%m-%d)" >> "$ACK_FILE"
+    echo -e "${GREEN}✅ '$ACK_TARGET' bestätigt${NC} — meldet sich nicht mehr pro Session."
+    echo -e "   ${CYAN}Rückgängig:${NC} bash _ai_context/scripts/ai-context-doctor.sh --unack $ACK_TARGET"
+    exit 0
+    ;;
+
+  unack)
+    if [ -z "$ACK_TARGET" ]; then
+      echo "Usage: ai-context-doctor.sh --unack <check-id>" >&2; exit 2
+    fi
+    if [ ! -f "$ACK_FILE" ] || ! is_acked "$ACK_TARGET"; then
+      echo -e "${YELLOW}'$ACK_TARGET' war nicht bestätigt.${NC}"; exit 0
+    fi
+    grep -vE "^[[:space:]]*$ACK_TARGET[[:space:]]*(#.*)?$" "$ACK_FILE" > "${ACK_FILE}.tmp" \
+      && mv "${ACK_FILE}.tmp" "$ACK_FILE"
+    echo -e "${GREEN}✅ '$ACK_TARGET' wird wieder gemeldet.${NC}"
+    exit 0
+    ;;
 
   check)
     run_checks

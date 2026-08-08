@@ -335,6 +335,46 @@ function symptomLine(body: string): string {
   return m ? m[1].trim() : '';
 }
 
+// ---------------------------------------------- Treffer-Stärke (V10 R2)
+// Ein blosser Mindest-Score trennt NICHT: gemessen scorte ein langer ADR
+// (219 Tokens) bei einer voellig unpassenden Frage 4 Punkte, waehrend der
+// korrekte Treffer bei einer echten Symptom-Frage nur 3 erreichte — lange
+// Prosa sammelt Treffer allein durch Laenge. Diese zwei Schwellen trennen
+// alle gemessenen Faelle sauber (hoechstes Rauschen 0.0183, niedrigster
+// echter Treffer 0.0484 — 0.03 liegt mit ~1,6x Abstand dazwischen).
+// Siehe decisions.md#injection_strength.
+const STRONG_TRIGGER_HITS = 2;
+const STRONG_DENSITY = 0.03;
+
+/**
+ * Zeilen, in denen der Autor festgehalten hat WANN ein Eintrag gilt —
+ * im Gegensatz zur erklaerenden Prosa drumherum. Bewusst OHNE die Chunk-ID:
+ * gemessen erzeugte deren Mitzaehlen einen Fehlalarm (die ID
+ * `silent_noop_needs_effect_test` matcht "test" aus jeder Testfrage).
+ */
+function triggerText(body: string): string {
+  const out: string[] = [];
+  for (const re of [/\n\?\s*([^\n]+)/g, /\ntrigger:\s*([^\n]+)/g, /\nscope:\s*([^\n]+)/g]) {
+    for (const m of body.matchAll(re)) out.push(m[1]);
+  }
+  return out.join(' ');
+}
+
+/** Ist dieser Chunk-Treffer stark genug fuer automatische Injektion? */
+function isStrongChunkHit(body: string, qTokens: Set<string>): boolean {
+  const bodyTokens = tokens(body);
+  if (bodyTokens.length === 0) return false;
+  const hay = new Set(bodyTokens);
+  const hits = [...qTokens].filter(t => hay.has(t)).length;
+  if (hits === 0) return false;
+
+  const trig = new Set(tokens(triggerText(body)));
+  const trigHits = [...qTokens].filter(t => trig.has(t)).length;
+  if (trigHits >= STRONG_TRIGGER_HITS) return true;
+
+  return hits / bodyTokens.length >= STRONG_DENSITY;
+}
+
 /** Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (siehe ctx.py parse_at_files). */
 function extractAtFiles(body: string): string[] {
   const m = body.match(/\n@\s*([^\n]+)/);
@@ -363,6 +403,10 @@ interface SymbolHit {
   line: string;
   args: string;
   score: number;
+  /** V10 R2: nur exakte Namens-Treffer sind stark genug fuer Auto-Injektion.
+   *  Generische Kurznamen (`read`, `boost`) verdraengten sonst die
+   *  eigentlich gesuchte Datei — beobachtet in v9-b. */
+  strong: boolean;
 }
 
 function parseSymbols(contextDir: string, qTokens: Set<string>): SymbolHit[] {
@@ -387,7 +431,8 @@ function parseSymbols(contextDir: string, qTokens: Set<string>): SymbolHit[] {
     const hay = new Set(tokens([name, currentFile, rest].join(' ')));
     const score = [...qTokens].filter(t => hay.has(t)).length +
       (qTokens.has(name.toLowerCase()) ? 3 : 0);
-    if (score > 0) hits.push({ name, file: currentFile, line: lineNo, args: rest.trim(), score });
+    if (score > 0) hits.push({ name, file: currentFile, line: lineNo, args: rest.trim(), score,
+      strong: qTokens.has(name.toLowerCase()) });
   }
   return hits.sort((a, b) => b.score - a.score);
 }
@@ -399,6 +444,7 @@ interface InterfaceHit {
   line: string;
   fields: string;
   score: number;
+  strong: boolean;
 }
 
 function parseInterfaces(contextDir: string, qTokens: Set<string>): InterfaceHit[] {
@@ -417,7 +463,8 @@ function parseInterfaces(contextDir: string, qTokens: Set<string>): InterfaceHit
     const hay = new Set(tokens([name, fields].join(' ')));
     const score = [...qTokens].filter(t => hay.has(t)).length +
       (qTokens.has(name.toLowerCase()) ? 3 : 0);
-    if (score > 0) hits.push({ name, file, line: lineNo, fields, score });
+    if (score > 0) hits.push({ name, file, line: lineNo, fields, score,
+      strong: qTokens.has(name.toLowerCase()) });
   }
   return hits.sort((a, b) => b.score - a.score);
 }
@@ -541,11 +588,26 @@ function semanticFallback(contextDir: string, query: string, chunks: RegistryChu
 export interface LocateResult {
   markdown: string;
   hitCount: number;
+  /** V10 R2: 'weak' = nur schwache Prosa-Überlappung. Der Prompt-Router
+   *  (--strict) injiziert nur bei 'strong', damit generische Prompts keinen
+   *  ungefragten Kontext erzeugen. Manuelle Aufrufe sehen weiterhin alles. */
+  strength: 'strong' | 'weak';
   /** Empfohlene Lese-Reihenfolge — für ai-symptom-router.sh's __ROUTER__-Marker (/ai-fix Skill). */
   filesToRead: string[];
 }
 
-export async function locateQuery(query: string, root: string): Promise<LocateResult> {
+export interface LocateOptions {
+  /** V10 R2: nur starke Treffer rendern. Der Prompt-Router nutzt das, damit
+   *  neben einem echten Treffer keine schwachen Prosa-Überlappungen
+   *  mitinjiziert werden. */
+  strongOnly?: boolean;
+}
+
+export async function locateQuery(
+  query: string,
+  root: string,
+  opts: LocateOptions = {},
+): Promise<LocateResult> {
   const contextDir = localContextDir(root);
   const libDir = path.join(contextDir, 'scripts', 'lib');
   const synonyms = loadSynonyms(libDir);
@@ -557,15 +619,15 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
 
   // ---- (a) Interaction Map ----
   const { rows: mapRows, state: mapState } = parseInteractionMap(contextDir);
-  const mapHits = mapRows
+  let mapHits = mapRows
     .map(r => ({ row: r, score: scoreMapRow(r, qTokens, qRaw) }))
     .filter(h => h.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
   // ---- (b)+(c) Symbols + Interfaces ----
-  const symbolHits = parseSymbols(contextDir, qTokens).slice(0, 3);
-  const interfaceHits = parseInterfaces(contextDir, qTokens).slice(0, 3);
+  let symbolHits = parseSymbols(contextDir, qTokens).slice(0, 3);
+  let interfaceHits = parseInterfaces(contextDir, qTokens).slice(0, 3);
 
   // ---- (d) Registry Chunks (Gotchas/Debug/Security/Rules) ----
   // registry.yaml ist gitignored — frischer Clone / ungescanntes Projekt
@@ -574,14 +636,25 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
   if (chunks.length === 0) {
     chunks = chunksFromMarkdownFallback(contextDir);
   }
-  const chunkHits = chunks
+  let chunkHits = chunks
     .map(c => {
       const body = extractChunkBody(contextDir, c.file, c.id) || '';
-      return { chunk: c, body, score: scoreChunk(body, qTokens) };
+      return {
+        chunk: c, body,
+        score: scoreChunk(body, qTokens),
+        strong: isStrongChunkHit(body, qTokens),
+      };
     })
     .filter(h => h.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
+
+  if (opts.strongOnly) {
+    chunkHits = chunkHits.filter(h => h.strong);
+    symbolHits = symbolHits.filter(h => h.strong);
+    interfaceHits = interfaceHits.filter(h => h.strong);
+    mapHits = mapHits.filter(h => h.score >= 2);
+  }
 
   // Drawer-Boost: Treffer, deren Datei zu einer keyword-matchenden Schublade
   // gehört, werden nach oben priorisiert (stabiler Sort, daher Re-Sort mit Boost).
@@ -615,6 +688,7 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
       }
       return {
         hitCount: semanticHits.length,
+        strength: 'weak',
         filesToRead: [semTopFile],
         markdown: lines.join('\n'),
       };
@@ -626,6 +700,7 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
       : '';
     return {
       hitCount: 0,
+      strength: 'weak',
       filesToRead: [],
       markdown: `Kein Index-Treffer für "${query}".${drawerHint}\nVersuch: \`grep -rn "${suggested}" .\``,
     };
@@ -748,6 +823,12 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
   const markdown = lines.join('\n');
   return {
     hitCount: mapHits.length + symbolHits.length + interfaceHits.length + chunkHits.length,
+    strength: (
+      chunkHits.some(h => h.strong) ||
+      symbolHits.some(h => h.strong) ||
+      interfaceHits.some(h => h.strong) ||
+      mapHits.some(h => h.score >= 2)
+    ) ? 'strong' : 'weak',
     filesToRead: filesToRead.slice(0, 5),
     markdown,
   };

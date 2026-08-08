@@ -36,9 +36,10 @@ IMPACT_GRAPH="$HOME/.ai-context/projects/$PROJECT_NAME/impact-graph.yaml"
 SHARED_DIR="$HOME/.ai-context/shared"
 GLOBAL_GOTCHAS="$SHARED_DIR/gotchas_global.md"
 
-# Read-Guard-Ledger aufräumen (Baustein 1): Session-Ledger älter als 24h sind
-# von toten Sessions und blähen $CONTEXT_DIR/.session/ sonst unbegrenzt auf.
-find "$CONTEXT_DIR/.session" -name '*.reads.jsonl' -mtime +1 -delete 2>/dev/null || true
+# Session-Ledger aufräumen (Read-Guard v8.1 + Prompt-Router-Dedup V10 R2):
+# Ledger älter als 24h stammen von toten Sessions und blähen
+# $CONTEXT_DIR/.session/ sonst unbegrenzt auf.
+find "$CONTEXT_DIR/.session" -name '*.jsonl' -mtime +1 -delete 2>/dev/null || true
 
 TODAY=$(date +"%Y-%m-%d %H:%M")
 TASK_HINT=""

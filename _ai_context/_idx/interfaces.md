@@ -1,5 +1,5 @@
 # Interface Snapshot — ai-context-engine
-> Auto-generiert: 2026-08-09 00:34 | Neu generieren: `bash _ai_context/scripts/ai-interface-snapshot.sh`
+> Auto-generiert: 2026-08-09 01:41 | Neu generieren: `bash _ai_context/scripts/ai-interface-snapshot.sh`
 > 18 Interfaces/Types — Format: `Name  Datei:Zeile  Felder`
 
 ProjectMetadata                 context_manager_agent.py:37          project_name, project_description, stack, folder_structure, generated_files, architecture_decisions, api_routes, db_models

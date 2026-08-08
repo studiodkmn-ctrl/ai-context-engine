@@ -1,6 +1,6 @@
 # Symbol Map — ai-context-engine
-> Auto-generiert: 2026-08-08 23:05 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
-> 13 Dateien · 95 Symbole · Direkt springen: Datei:Zeilennummer
+> Auto-generiert: 2026-08-09 00:34 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> 13 Dateien · 96 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `bench/ai-bench.py`
   find_claude_binary                  L38    
@@ -41,33 +41,34 @@
 ## `mcp/src/capture-cli.ts`
   main                                L11    
 ## `mcp/src/lib/locate.ts`
-  tokens                              L26    
-  raw                                 L27    
-  loadSynonyms                        L32      — ------------------------------------------------------------
-  expandQueryTokens                   L51    
-  parseDrawers                        L70    
-  globToRegExp                        L98    
-  matchingDrawers                     L118   
-  fileInDrawer                        L122   
-  parseInteractionMap                 L135   
-  scoreMapRow                         L160   
-  parseRegistry                       L188   
-  parseKnowledgeManifest              L260     — Minimaler zeilenbasierter Parser, gleicher Stil wie parseDra
-  knowledgeFiles                      L283   
-  chunksFromMarkdownFallback          L291   
-  extractChunkBody                    L315   
-  escapeRe                            L328   
-  symptomLine                         L332   
-  extractAtFiles                      L338     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
-  scoreChunk                          L344   
-  freshnessNote                       L352   
-  parseSymbols                        L367   
-  parseInterfaces                     L403   
-  parseInvariants                     L432   
-  parseImpactGraph                    L462     — ------------------------------------------------------------
-  locateQuery                         L492   
-  boost                               L532     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
-  addFile                             L656   
+  tokens                              L27    
+  raw                                 L28    
+  loadSynonyms                        L33      — ------------------------------------------------------------
+  expandQueryTokens                   L52    
+  parseDrawers                        L71    
+  globToRegExp                        L99    
+  matchingDrawers                     L119   
+  fileInDrawer                        L123   
+  parseInteractionMap                 L136   
+  scoreMapRow                         L161   
+  parseRegistry                       L189   
+  parseKnowledgeManifest              L261     — Minimaler zeilenbasierter Parser, gleicher Stil wie parseDra
+  knowledgeFiles                      L284   
+  chunksFromMarkdownFallback          L292   
+  extractChunkBody                    L316   
+  escapeRe                            L329   
+  symptomLine                         L333   
+  extractAtFiles                      L339     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
+  scoreChunk                          L345   
+  freshnessNote                       L353   
+  parseSymbols                        L368   
+  parseInterfaces                     L404   
+  parseInvariants                     L433   
+  parseImpactGraph                    L463     — ------------------------------------------------------------
+  semanticFallback                    L499   
+  locateQuery                         L548   
+  boost                               L588     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
+  addFile                             L740   
 ## `mcp/src/lib/paths.ts`
   findProjectRoot                     L9     
   localContextDir                     L23      — Pfad zum projektlokalen `_ai_context`-Ordner.

@@ -41,6 +41,11 @@ STOPWORDS_DE_EN = {
     # additional garbage observed in real registry.yaml output (S5 fix)
     "erzeugt", "voll", "schlecht", "immer", "alle", "hier", "dort",
     "auch", "sind", "sein", "eine", "einer", "einem", "einen",
+    # v9-b: "wie" fehlte und matchte fast jeden Vergleichs-Kommentar
+    # ("... gleicher Stil wie ...") — entdeckt durch den Prompt-Router-
+    # Rauschtest (Anfrage "Wie ist das Wetter..." traf faelschlich einen
+    # Treffer, siehe decisions.md).
+    "wie",
 }
 
 MIN_TAG_LEN = 4

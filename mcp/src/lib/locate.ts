@@ -16,9 +16,10 @@ import { localContextDir, crossProjectsDir } from './paths.js';
 const STOP = new Set([
   'the', 'a', 'an', 'is', 'are', 'not', 'does', 'doesnt', 'do', 'my',
   'on', 'in', 'at', 'to', 'it', 'this', 'that', 'when', 'and', 'or',
-  'der', 'die', 'das', 'ein', 'eine', 'und', 'oder', 'nicht', 'kein',
-  'keine', 'ist', 'geht', 'mehr', 'wenn', 'beim', 'mir', 'ich', 'sich',
-  'wird', 'war', 'aber', 'dann', 'noch', 'auch', 'reagiert', 'funktioniert',
+  'der', 'die', 'das', 'ein', 'eine', 'einer', 'einem', 'einen', 'und',
+  'oder', 'nicht', 'kein', 'keine', 'ist', 'geht', 'mehr', 'wenn', 'beim',
+  'mir', 'ich', 'sich', 'wie', 'wird', 'war', 'aber', 'dann', 'noch',
+  'auch', 'reagiert', 'funktioniert',
   'works', 'work', 'broken', 'bug', 'fix', 'fehler', 'problem', 'kaputt',
 ]);
 

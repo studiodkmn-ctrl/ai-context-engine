@@ -42,3 +42,5 @@ Due:           -
 - Testfakt SMOKE-1786218986998: stdio MCP funktioniert  (2026-08-08) <!-- hash:760ad68b6bd7 -->
 
 - Intent: feat(v9-a): knowledge.manifest.yaml — einzige Quelle für Wissensdateien  (2026-08-08) <!-- hash:e4dee2157e61 -->
+
+- Testfakt SMOKE-1786220826620: stdio MCP funktioniert  (2026-08-08) <!-- hash:1c7f18e0792b -->

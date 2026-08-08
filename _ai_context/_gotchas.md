@@ -5,6 +5,25 @@
 
 ## Aktiv
 
+<!-- #stopword_lists_incomplete -->
+```
+ID: stopword_lists_incomplete
+P: 2
+seen: 2026-08-08
+→ locate()/ai-symptom-router.sh/ctx.py pflegen je eine STOP(WORDS)-Liste;
+  ein fehlendes Wort (z.B. "wie" fehlte) matcht als "lebendiges" Token
+  fast jeden Prosa-Kommentar mit ähnlicher Formulierung → False-Positive
+✗ Neue Wortlisten/Prompt-Router ungetestet gegen unrelated Prompts lassen
+✓ Vor Rollout: locate() mit 2-3 völlig themenfremden Fragen testen
+  ("Wie ist das Wetter..." Muster) — muss "Kein Index-Treffer" liefern
+? Prompt-Router (ai-prompt-router.sh) injiziert bei jedem Fehlalarm
+  ungefragt Kontext in JEDEN Prompt — Rauschen ist hier teurer als bei
+  einem manuell aufgerufenen locate()
+@ mcp/src/lib/locate.ts, _ai_context/scripts/ai-symptom-router.sh,
+  _ai_context/scripts/lib/ctx.py
+```
+<!-- /stopword_lists_incomplete -->
+
 <!-- #silent_noop_needs_effect_test -->
 ```
 ID: silent_noop_needs_effect_test

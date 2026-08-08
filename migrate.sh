@@ -243,11 +243,12 @@ CAT_SESSION_CMD="cat _ai_context/_SESSION.md 2>/dev/null || true"
 PII_CMD="if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hooks/pii-warn.sh; fi"
 SELFCHECK_CMD="if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi"
 READGUARD_CMD="[ -f _ai_context/scripts/ai-read-guard.sh ] && bash _ai_context/scripts/ai-read-guard.sh || true"
+ROUTER_CMD="[ -f _ai_context/scripts/ai-prompt-router.sh ] && bash _ai_context/scripts/ai-prompt-router.sh || true"
 
 mkdir -p ".claude"
 
 if command -v python3 &>/dev/null; then
-  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" "$READGUARD_CMD" << 'PYEOF'
+  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" "$READGUARD_CMD" "$ROUTER_CMD" << 'PYEOF'
 import json, sys, pathlib
 
 path      = pathlib.Path(sys.argv[1])
@@ -257,6 +258,7 @@ pii_cmd     = sys.argv[4]
 cat_session_cmd = sys.argv[5]
 selfcheck_cmd   = sys.argv[6]
 readguard_cmd   = sys.argv[7]
+router_cmd      = sys.argv[8]
 
 if path.exists():
     try:
@@ -338,6 +340,18 @@ if not has_pii:
     print("   ✅ UserPromptSubmit: pii-warn.sh hinzugefügt")
 else:
     print("   ✅ UserPromptSubmit: pii-warn.sh bereits vorhanden")
+
+# ---- v9-b: UserPromptSubmit — Prompt-Router (locate() ohne Kommando) ----
+has_router = any(
+    any("ai-prompt-router" in h.get("command", "") for h in g.get("hooks", []))
+    for g in pii_groups
+)
+if not has_router:
+    pii_groups.append({"matcher": "", "hooks": [{"type": "command", "command": router_cmd}]})
+    changed = True
+    print("   ✅ UserPromptSubmit: ai-prompt-router.sh hinzugefügt")
+else:
+    print("   ✅ UserPromptSubmit: ai-prompt-router.sh bereits vorhanden")
 
 # ---- v8.1: PreToolUse — Duplicate-Read-Guard ----
 rg_groups = hooks.setdefault("PreToolUse", [])

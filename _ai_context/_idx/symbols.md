@@ -1,7 +1,16 @@
 # Symbol Map — ai-context-engine
-> Auto-generiert: 2026-08-08 22:51 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
-> 12 Dateien · 87 Symbole · Direkt springen: Datei:Zeilennummer
+> Auto-generiert: 2026-08-08 23:05 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> 13 Dateien · 95 Symbole · Direkt springen: Datei:Zeilennummer
 
+## `bench/ai-bench.py`
+  find_claude_binary                  L38    
+  parse_tasks_yaml                    L49      — Minimaler Parser fuer das flache tasks.yaml-Schema (kein PyY
+  make_arm_copy                       L94    
+  run_claude                          L106   
+  grade                               L120   
+  run_task                            L128   
+  generate_report                     L172   
+  main                                L219   
 ## `context_manager_agent.py`
   ProjectMetadata                     L37    
   ContextManagerConfig                L56    

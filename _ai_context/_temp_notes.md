@@ -40,3 +40,5 @@ Due:           -
 - Intent: fix(v8.1.1): migrate.sh vergaß playbooks.md + PreToolUse-Hook  (2026-08-08) <!-- hash:0d03655126dd -->
 
 - Testfakt SMOKE-1786218986998: stdio MCP funktioniert  (2026-08-08) <!-- hash:760ad68b6bd7 -->
+
+- Intent: feat(v9-a): knowledge.manifest.yaml — einzige Quelle für Wissensdateien  (2026-08-08) <!-- hash:e4dee2157e61 -->

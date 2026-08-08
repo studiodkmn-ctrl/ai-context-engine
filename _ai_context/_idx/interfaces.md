@@ -1,6 +1,6 @@
 # Interface Snapshot — ai-context-engine
-> Auto-generiert: 2026-08-09 01:41 | Neu generieren: `bash _ai_context/scripts/ai-interface-snapshot.sh`
-> 18 Interfaces/Types — Format: `Name  Datei:Zeile  Felder`
+> Auto-generiert: 2026-08-09 01:58 | Neu generieren: `bash _ai_context/scripts/ai-interface-snapshot.sh`
+> 19 Interfaces/Types — Format: `Name  Datei:Zeile  Felder`
 
 ProjectMetadata                 context_manager_agent.py:37          project_name, project_description, stack, folder_structure, generated_files, architecture_decisions, api_routes, db_models
 ContextManagerConfig            context_manager_agent.py:56          model, max_tokens, context_dir_name, today, max_file_lines
@@ -8,11 +8,12 @@ Drawer                          mcp/src/lib/locate.ts:64             id, index, 
 MapRow                          mcp/src/lib/locate.ts:128            elem, loc, handler, store, endpoint, elem, loc, handler
 RegistryChunk                   mcp/src/lib/locate.ts:178            id, type, priority, file, tags, seen, code_touched, status
 ManifestEntry                   mcp/src/lib/locate.ts:255            path, type
-SymbolHit                       mcp/src/lib/locate.ts:360            name, file, line, args, score, name, file, line
-InterfaceHit                    mcp/src/lib/locate.ts:396            name, file, line, fields, score, id, level, rule
-Invariant                       mcp/src/lib/locate.ts:426            id, level, rule, scope
-SemanticHit                     mcp/src/lib/locate.ts:486            chunk, simPct, encoding, timeout, stdio
-LocateResult                    mcp/src/lib/locate.ts:541            markdown, hitCount, filesToRead
+SymbolHit                       mcp/src/lib/locate.ts:400            name, file, line, args, score, strong, strong
+InterfaceHit                    mcp/src/lib/locate.ts:441            name, file, line, fields, score, strong, strong, id
+Invariant                       mcp/src/lib/locate.ts:473            id, level, rule, scope
+SemanticHit                     mcp/src/lib/locate.ts:533            chunk, simPct, encoding, timeout, stdio
+LocateResult                    mcp/src/lib/locate.ts:588            markdown, hitCount, strength, filesToRead, strongOnly?, query, root, opts
+LocateOptions                   mcp/src/lib/locate.ts:599            strongOnly?, query, root, opts
 Meta                            mcp/src/lib/projectId.ts:7           projectId, origin, createdAt, cwd, encoding, timeout
 SaveResult                      mcp/src/lib/save.ts:17               saved, file, reason?, gotcha, debug, security, decision, endpoint
 SearchHit                       mcp/src/lib/search.ts:4              file, relFile, line, snippet, score, source, project?

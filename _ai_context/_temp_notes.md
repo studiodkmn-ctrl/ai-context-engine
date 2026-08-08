@@ -36,3 +36,5 @@ Due:           -
 > Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md
 
 - Intent: fix(v10-r1): Wissensbasis entgiften + demo_content-Check  (2026-08-08) <!-- hash:157267861aab -->
+
+- Intent: fix(v10-r2): Injektion nur bei starkem Treffer + Doctor-Quittierung  (2026-08-08) <!-- hash:ed1e7e14bacc -->

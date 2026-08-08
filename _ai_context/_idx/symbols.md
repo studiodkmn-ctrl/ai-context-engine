@@ -1,6 +1,6 @@
 # Symbol Map — ai-context-engine
-> Auto-generiert: 2026-08-09 01:41 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
-> 13 Dateien · 96 Symbole · Direkt springen: Datei:Zeilennummer
+> Auto-generiert: 2026-08-09 01:58 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> 13 Dateien · 98 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `bench/ai-bench.py`
   find_claude_binary                  L38    
@@ -58,17 +58,19 @@
   extractChunkBody                    L316   
   escapeRe                            L329   
   symptomLine                         L333   
-  extractAtFiles                      L339     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
-  scoreChunk                          L345   
-  freshnessNote                       L353   
-  parseSymbols                        L368   
-  parseInterfaces                     L404   
-  parseInvariants                     L433   
-  parseImpactGraph                    L463     — ------------------------------------------------------------
-  semanticFallback                    L499   
-  locateQuery                         L548   
-  boost                               L588     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
-  addFile                             L740   
+  triggerText                         L355   
+  isStrongChunkHit                    L364     — Ist dieser Chunk-Treffer stark genug fuer automatische Injek
+  extractAtFiles                      L379     — Plausible Dateipfade aus der `@ file1, file2, ...`-Zeile (si
+  scoreChunk                          L385   
+  freshnessNote                       L393   
+  parseSymbols                        L412   
+  parseInterfaces                     L450   
+  parseInvariants                     L480   
+  parseImpactGraph                    L510     — ------------------------------------------------------------
+  semanticFallback                    L546   
+  locateQuery                         L606   
+  boost                               L661     — gehört, werden nach oben priorisiert (stabiler Sort, daher R
+  addFile                             L815   
 ## `mcp/src/lib/paths.ts`
   findProjectRoot                     L9     
   localContextDir                     L23      — Pfad zum projektlokalen `_ai_context`-Ordner.

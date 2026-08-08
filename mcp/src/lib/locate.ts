@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { localContextDir, crossProjectsDir } from './paths.js';
 
 /**
@@ -481,6 +482,61 @@ function parseImpactGraph(graphPath: string): Map<string, string[]> {
   return out;
 }
 
+// ------------------------------------------------------------ semantic fallback (v9-e / B2)
+interface SemanticHit {
+  chunk: RegistryChunk;
+  simPct: number;
+}
+
+/**
+ * Semantischer Fallback über die bestehende Ollama-Embedding-Infrastruktur
+ * (ai-rag-cache.sh), nur wenn Keyword-Matching nichts gefunden hat und die
+ * Pro-Edition installiert ist (gleicher Guard wie ai-rag-cache.sh selbst).
+ * Fail-open bei jedem Fehler (Timeout, Ollama down, Script fehlt, Simple-
+ * Edition) — liefert dann einfach [], locate() bleibt beim bisherigen
+ * "Kein Index-Treffer"-Verhalten (siehe decisions.md#semantic_fallback).
+ */
+function semanticFallback(contextDir: string, query: string, chunks: RegistryChunk[]): SemanticHit[] {
+  try {
+    const edition = fs.readFileSync(path.join(os.homedir(), '.ai-context', 'edition'), 'utf8').trim();
+    if (edition !== 'pro') return [];
+  } catch {
+    return [];
+  }
+
+  const ragScript = path.join(contextDir, 'scripts', 'ai-rag-cache.sh');
+  if (!fs.existsSync(ragScript)) return [];
+
+  let out = '';
+  try {
+    out = execFileSync('bash', [ragScript, '--find', query], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return [];
+  }
+  // ai-rag-cache.sh --find hat zwei Tabellenformate: [OLLAMA] (frischer
+  // Embed-Vergleich, mit "(sim:XX%)"-Suffix) und [CACHE-HIT] (Treffer aus
+  // dem SQLite-Query-Cache — gleiche Spalten, aber OHNE sim%-Suffix, da
+  // die Ähnlichkeit nicht neu berechnet wird). Beide sind gültige Treffer;
+  // ohne diese Unterscheidung würden wiederholte Anfragen — der Kernzweck
+  // des Caches — hier still leer zurückkommen (siehe decisions.md).
+  if (!out.includes('[OLLAMA]') && !out.includes('[CACHE-HIT]')) return [];
+
+  const byId = new Map(chunks.map(c => [c.id, c]));
+  const hits: SemanticHit[] = [];
+  const rowRe = /^\s*P(\d)\s+(\S+)\s+\S+\s+\d+(?:\s+\(sim:(\d+)%\))?\s*$/;
+  for (const line of out.split('\n')) {
+    const m = rowRe.exec(line);
+    if (!m) continue;
+    const chunk = byId.get(m[2]);
+    if (chunk) hits.push({ chunk, simPct: m[3] ? parseInt(m[3], 10) : -1 });
+  }
+  return hits.sort((a, b) => b.simPct - a.simPct);
+}
+
 // ------------------------------------------------------------------ locate()
 export interface LocateResult {
   markdown: string;
@@ -536,6 +592,34 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
     interfaceHits.length > 0 || chunkHits.length > 0;
 
   if (!anyHit) {
+    // v9-e: bevor "Kein Index-Treffer" — semantischer Fallback über Ollama
+    // (nur Pro-Edition, fail-open bei jedem Fehler, siehe semanticFallback()).
+    const semanticHits = semanticFallback(contextDir, query, chunks).slice(0, 5);
+    if (semanticHits.length > 0) {
+      const lines: string[] = [];
+      lines.push(`🔎 locate("${query}")`);
+      lines.push('');
+      lines.push('🧠 Semantisch verwandt (Ollama):');
+      for (const h of semanticHits) {
+        const simLabel = h.simPct >= 0 ? `sim:${h.simPct}%` : 'gecacht';
+        lines.push(`   ${h.chunk.id} [P${h.chunk.priority}]${freshnessNote(h.chunk)} — ${simLabel}`);
+      }
+      const semTopFile = semanticHits[0].chunk.file;
+      const semInvariants = parseInvariants(contextDir).filter(inv => globToRegExp(inv.scope).test(semTopFile));
+      if (semInvariants.length) {
+        lines.push('');
+        lines.push('🔒 Invariante:');
+        for (const inv of semInvariants.slice(0, 2)) {
+          lines.push(`   ${inv.id} (${inv.level}) — ${inv.rule}`);
+        }
+      }
+      return {
+        hitCount: semanticHits.length,
+        filesToRead: [semTopFile],
+        markdown: lines.join('\n'),
+      };
+    }
+
     const suggested = [...qTokens].slice(0, 3).join(' ');
     const drawerHint = hitDrawers.length
       ? `\nSchublade "${hitDrawers[0].id}" passt thematisch — direkt lesen: \`${hitDrawers[0].index}\``

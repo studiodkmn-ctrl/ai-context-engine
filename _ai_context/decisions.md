@@ -83,6 +83,33 @@ Jede Stelle behält einen hartcodierten Fallback, falls das Manifest fehlt
 
 ---
 
+### ADR-007: semantischer locate()-Fallback über die bestehende Ollama-Infrastruktur
+**Date:** 2026-08-09 | **Status:** Accepted
+
+**Context:** `locate()` findet bei falschem Vokabular nichts ("Anmeldung
+kaputt" statt "login"). Die Embedding-Infrastruktur (`ai-rag-cache.sh`,
+SQLite-Query-Cache, `nomic-embed-text`) existierte bereits vollständig,
+war aber nie mit `locate()` verbunden.
+**Decision:** `locate.ts` ruft `ai-rag-cache.sh --find` per `execFileSync`
+NUR wenn Keyword-Matching nichts fand (`!anyHit`) UND
+`~/.ai-context/edition == "pro"` — fail-open bei jedem Fehler (Timeout,
+Ollama down, Simple-Edition). Beim Bauen fiel auf, dass `--find` zwei
+Tabellenformate hat: `[OLLAMA]` (frischer Vergleich, mit `sim:%`) und
+`[CACHE-HIT]` (aus dem Query-Cache, OHNE `sim:%`) — ein Parser, der nur
+`[OLLAMA]` erkennt, verwirft wiederholte Anfragen (dem Kernzweck des
+Caches) still. Beide Formate werden jetzt geparst, Cache-Treffer als
+"gecacht" statt Prozentzahl markiert.
+**Consequences:**
+  + Simple-Edition-Nutzer bemerken keinen Unterschied (Guard greift vorher,
+    kein Ollama-Aufruf).
+  + Kein neuer State, keine neue Datei — reine Verdrahtung Bestehendem.
+  - Embedding-Qualität auf diesem kleinen, kurzen Gotcha-Korpus ist
+    mittelmäßig (beobachtete Similarity-Werte 56-63% für Treffer und
+    Nicht-Treffer ähnlich nah beieinander) — Fallback hilft bei
+    Vokabular-Mismatch, ersetzt aber keine echte Relevanz-Sortierung.
+
+---
+
 ## ❌ Rejected Alternatives
 > So Claude (and you) don't fall into the same trap again.
 > Bisher keine — Template: `decisions_guide.md`

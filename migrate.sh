@@ -186,6 +186,16 @@ fi
 echo ""
 
 # =============================================================================
+# 3b. v9-e: Multi-Agent-Adapter (AGENTS.md + duenne Pointer) — idempotent,
+# daher unconditional bei jeder Migration erneut ausfuehrbar.
+# =============================================================================
+AGENTS_SYNC="_ai_context/scripts/ai-agents-sync.sh"
+if [ -f "$AGENTS_SYNC" ]; then
+  bash "$AGENTS_SYNC" 2>&1 | sed 's/^/   /'
+  echo ""
+fi
+
+# =============================================================================
 # 4. Hooks patchen
 # =============================================================================
 

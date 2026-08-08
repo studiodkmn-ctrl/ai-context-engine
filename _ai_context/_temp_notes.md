@@ -52,3 +52,5 @@ Due:           -
 - Intent: feat(v9-c): ai-session-reflect.sh — automatisches Lernen (Stop/PreCompact)  (2026-08-08) <!-- hash:ad231a728a52 -->
 
 - Intent: feat(v9-d): bench/ai-bench.sh — Beweis-Harness statt Schätzungen  (2026-08-08) <!-- hash:e31720788f31 -->
+
+- Testfakt SMOKE-1786228402256: stdio MCP funktioniert  (2026-08-08) <!-- hash:e6ea6ff2efbf -->

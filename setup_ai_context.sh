@@ -503,6 +503,12 @@ if [ -d "$CLAUDE_SKILLS_TEMPLATE" ]; then
   echo -e "${GREEN}✅   .claude/skills/ (ai-fix, ai-doctor, ai-transfer)${NC}"
 fi
 
+# ---- v9-e: Multi-Agent-Adapter (AGENTS.md + duenne Pointer) ----
+AGENTS_SYNC="$CONTEXT_DIR/scripts/ai-agents-sync.sh"
+if [ -f "$AGENTS_SYNC" ]; then
+  bash "$AGENTS_SYNC" 2>&1 | sed 's/^/   /'
+fi
+
 # ---- Git hooks ----
 if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   GIT_HOOKS_DIR="$(git rev-parse --git-dir)/hooks"

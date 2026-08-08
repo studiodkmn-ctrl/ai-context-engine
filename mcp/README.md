@@ -13,7 +13,7 @@ nur lesen wenn nichts gefunden.*
 | `session_context()` | Kompakter Projektkontext (`_SESSION.md`, Fallback: Index + Quick-Facts). |
 | `capture_from_diff(apply?, range?)` | Liest git-diff, schlägt Erkenntnisse vor. `apply=true` schreibt sie (Dedup). |
 
-`type` ∈ `gotcha · debug · security · decision · endpoint · auth · component · note`
+`type` ∈ `gotcha · debug · security · decision · endpoint · auth · component · playbook · note`
 
 ## Bauen & Testen
 

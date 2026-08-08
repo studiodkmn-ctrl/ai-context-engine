@@ -1,21 +1,24 @@
-# ⚠️ Gotchas — /Users/adnandikmen/Desktop/test-kontext
+# ⚠️ Gotchas — ai-context-engine
 > **Max 15. Code-Format. Laden bei jedem Coding-Task.**
-> Aktualisiert: 2026-04-14
+> Aktualisiert: 2026-08-06
 > P: 1=kritisch (nie löschen) | 2=wichtig (default) | 3=nice-to-know (zuerst archiviert)
 
 ## Aktiv
 
-<!-- #auth_version -->
+<!-- #silent_noop_needs_effect_test -->
 ```
-ID: auth_version
-P: 2
-→ NextAuth v5 ≠ v4
-✗ getServerSession()          ← v4, veraltet
-✓ auth() from "next-auth"     ← v5, korrekt
-? session.user undefined → prüfe auth callback signature
-@ src/lib/auth.ts, alle API routes
+ID: silent_noop_needs_effect_test
+P: 1
+seen: 2026-08-06
+→ Hook/Skript kann fehlerfrei durchlaufen und trotzdem nichts bewirken
+  (falsches Zielmuster/Pfad) — kein Fehler beweist keine Wirkung
+✗ Test prüft nur Exit-Code
+✓ Test prüft echte Wirkung danach (ai-verify-self.sh Check 12)
+? Mechanismus gilt seit Versionen als ok, ändert aber nie etwas
+  (Beispiel: Auto-Invalidierung war seit v5 tot, fix 084fcd4)
+@ hooks/post-commit, ai-verify-self.sh
 ```
-<!-- /auth_version -->
+<!-- /silent_noop_needs_effect_test -->
 
 <!-- #prisma_singleton -->
 ```

@@ -11,6 +11,7 @@ export type FactType =
   | 'endpoint'
   | 'auth'
   | 'component'
+  | 'playbook'
   | 'note';
 
 export interface SaveResult {
@@ -28,6 +29,7 @@ const ROUTE: Record<FactType, string> = {
   endpoint: path.join('backend', 'endpoints.md'),
   auth: path.join('backend', 'auth.md'),
   component: path.join('frontend', 'components.md'),
+  playbook: 'playbooks.md',
   note: '_temp_notes.md',
 };
 

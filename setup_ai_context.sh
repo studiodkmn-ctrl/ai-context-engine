@@ -530,7 +530,7 @@ fi
 # ---- .gitignore ----
 GITIGNORE="$TARGET_DIR/.gitignore"
 touch "$GITIGNORE"
-for pattern in "_ai_context/_SESSION.md" "_ai_context/.context_hash" "_ai_context/registry.yaml" "*.bak"; do
+for pattern in "_ai_context/_SESSION.md" "_ai_context/.context_hash" "_ai_context/registry.yaml" "_ai_context/.session/" "*.bak"; do
   grep -q "$pattern" "$GITIGNORE" 2>/dev/null || printf '%s\n' "$pattern" >> "$GITIGNORE"
 done
 

@@ -1,94 +1,39 @@
-# 📋 Temp Notes — /Users/adnandikmen/Desktop/test-kontext
+# 📋 Temp Notes — ai-context-engine
 > **Sprint info, active tasks, recent changes. Rolling window — auto-trimmed.**
 > Load for: current task context, sprint status, what changed recently.
-> Last updated: 2026-04-14
+> Last updated: 2026-08-06
 
 ---
 
 ## 🎯 Sprint Snapshot
 ```
-Sprint goal:   [One sentence — what we're building this sprint]
-Active task:   [What Claude is currently helping with right now]
-Blocked by:    [Nothing / description of blocker]
-Due:           [Date or milestone]
+Sprint goal:   Repo-Hygiene — siehe current_sprint.md
+Active task:   -
+Blocked by:    Nichts
+Due:           -
 ```
 
 ---
 
 ## 🔄 Recent Changes (last 5)
 ```
-2026-04-14 — [What changed in one line]
-2026-04-14 — [What changed in one line]
-2026-04-14 — [What changed in one line]
-2026-04-14 — [What changed in one line]
-2026-04-14 — [What changed in one line]
+2026-08-06 — Repo-Hygiene: Pro-Rollout, drawer-split-orphan-Fix, memory_save-Trim
+2026-07-28 — fix(v8.0.1): Auto-Invalidierung war seit v5 wirkungslos + Verteilung repariert
+2026-07-15 — fix: setup_ai_context.sh Banner hardcoded v6.5/v6.6
+2026-07-11 — feat(v8-d): onboarding — uninstall, setup invite, stack-aware drawers
+2026-07-11 — feat(v8-c): CI pipeline + end-to-end self-test harness
 ```
 > Auto-updated by post-commit hook. Max 5 entries — older entries trimmed automatically.
 
 ---
 
-## 📋 Active Tasks
-```
-In Progress:
-  - [ ] [Current task]
-
-Open:
-  - [ ] [Next task]
-  - [ ] [Backlog item]
-
-Done this sprint:
-  - [x] [Completed task]
-```
+## 📋 Active Tasks / Session Notes
+> Siehe `current_sprint.md`.
 
 ---
-
-## 🧠 Session Notes (cleared each sprint)
-```
-[Any temporary context Claude should know this sprint but not permanently]
-```
-
----
-> RULE: Trim "Recent Changes" to last 5 after every update.
-> RULE: Clear "Session Notes" at sprint start.
+> RULE: Recent Changes max 5, memory_save-Notes (unten) max 10 — beide
+>       Auto-Trim in hooks/post-commit. ⇒ _gotchas.md#silent_noop_needs_effect_test
 > Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md
-
-- Intent: feat(v7-phase1): shared ctx.py lib + tag-quality/synonym fixes  (2026-07-07) <!-- hash:76f8ff9a4f01 -->
-
-- Intent: feat(v7-phase2): freshness model (seen/code_touched/status)  (2026-07-07) <!-- hash:6b4e518e207f -->
-
-- Intent: feat(v7-phase3): drawers.yaml content-routing manifest  (2026-07-07) <!-- hash:19bc12e214bf -->
-
-- Testfakt SMOKE-1783421807316: stdio MCP funktioniert  (2026-07-07) <!-- hash:19a066365c26 -->
-
-- Testfakt SMOKE-1783421960409: stdio MCP funktioniert  (2026-07-07) <!-- hash:5f889daee693 -->
-
-- Intent: feat(v7-phase4): locate() MCP tool — single lookup for all drawers  (2026-07-07) <!-- hash:d5441cb95373 -->
-
-- Testfakt SMOKE-1783422265977: stdio MCP funktioniert  (2026-07-07) <!-- hash:c75792a15827 -->
-
-- Intent: feat(v7-phase5): wire up interaction map + fix concise-arrow endpoint gap  (2026-07-07) <!-- hash:023603f256ef -->
-
-- Intent: feat(v7-phase6): session-start entschlacken  (2026-07-09) <!-- hash:6a37e0c4ed35 -->
-
-- Testfakt SMOKE-1783622207717: stdio MCP funktioniert  (2026-07-09) <!-- hash:14e5387e7703 -->
-
-- Intent: docs(v7-phase7): README/CLAUDE.md v7 docs, VERSION 7.0.0, migrate.sh  (2026-07-09) <!-- hash:0e890808f8e8 -->
-
-- Testfakt SMOKE-1783623732604: stdio MCP funktioniert  (2026-07-09) <!-- hash:4eb0574fd10a -->
-
-- Intent: fix(v7): production-readiness pass — missing template files + 3 bugs  (2026-07-09) <!-- hash:f78c2caa928b -->
-
-- Intent: fix(v7): require colon/paren after TODO markers in capture heuristic  (2026-07-09) <!-- hash:c10003beb83e -->
-
-- Intent: fix(v7): locate registry fallback, hook local-first, global install refresh  (2026-07-09) <!-- hash:dfaca3c9fdcd -->
-
-- Intent: fix(v7): migrate.sh installs core scripts on v5.x projects  (2026-07-09) <!-- hash:74f6e6e528d4 -->
-
-- Testfakt SMOKE-1783624453565: stdio MCP funktioniert  (2026-07-09) <!-- hash:b19b01877692 -->
-
-- Intent: feat(v7): roll out to all registered projects, close remaining gaps  (2026-07-09) <!-- hash:91d766f6ff0a -->
-
-- Testfakt SMOKE-1783642024558: stdio MCP funktioniert  (2026-07-10) <!-- hash:f0afa93ad961 -->
 
 - Intent: feat(v8-a): self-update loop — selfcheck, rollback, trusted-origin guard  (2026-07-11) <!-- hash:877aa8156959 -->
 
@@ -107,3 +52,9 @@ Done this sprint:
 - Testfakt SMOKE-1785196871833: stdio MCP funktioniert  (2026-07-28) <!-- hash:85dc929a211c -->
 
 - Intent: fix(v8.0.1): Auto-Invalidierung war seit v5 wirkungslos + Verteilung reparieren  (2026-07-28) <!-- hash:5ce43b743b11 -->
+
+- Testfakt SMOKE-1785985172119: stdio MCP funktioniert  (2026-08-06) <!-- hash:d9c345fc1e8e -->
+
+- Testfakt SMOKE-1785986485115: stdio MCP funktioniert  (2026-08-06) <!-- hash:e1a5824b1a9e -->
+
+- Testfakt SMOKE-1786210226084: stdio MCP funktioniert  (2026-08-08) <!-- hash:0b210cbc14e3 -->

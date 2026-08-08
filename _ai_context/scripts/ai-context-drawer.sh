@@ -132,6 +132,13 @@ split_domain_file() {
   echo -e "  ${CYAN}↳ Split: $rel_file → ${fname}_core.md + ${fname}_extended.md${NC}"
   DRAWERS_CREATED=$(( DRAWERS_CREATED + 1 ))
 
+  # FIX (v8.0.2): Original blieb nach dem Split liegen — Inhalt existierte
+  # doppelt (Original + Core/Extended), driftete auseinander und der
+  # Oversize-Check in ai-context-doctor.sh meldete ihn für immer weiter,
+  # weil er unverändert > threshold Zeilen hatte. Jetzt entfernen: der
+  # Inhalt lebt vollständig in Core + Extended weiter.
+  rm -f "$abs_file"
+
   # Domain-Index aktualisieren (falls vorhanden)
   local domain
   domain=$(dirname "$rel_file")
@@ -145,6 +152,19 @@ split_domain_file() {
     ext_escaped=$(echo "$ext_rel" | sed 's/\//\\\//g')
     # Ersetze alten Eintrag durch zwei neue
     sed -i.bak "s#| \`${escaped}\` | ✅ | .* |#| \`${core_escaped}\` | ✅ | Core (Split) |\n| \`${ext_escaped}\` | ✅ | Extended (bei Bedarf laden) |#" "$idx_file" 2>/dev/null && rm -f "${idx_file}.bak"
+  fi
+
+  # FIX (v8.0.2): drawers.yaml routet locate() über "index: <datei>" direkt
+  # zur Domain-Datei. Blieb das beim Split unangepasst, empfahl locate()
+  # nach einem Split weiterhin die (jetzt gelöschte) Originaldatei. Zeigt
+  # eine Schublade exakt auf die gesplittete Datei, auf die Core-Datei
+  # umbiegen — Extended bleibt über die Core-Kopfzeile erreichbar.
+  if [ -f "$DRAWERS_FILE" ]; then
+    local rel_escaped
+    rel_escaped=$(printf '%s' "$rel_file" | sed 's/[\/&]/\\&/g')
+    local core_rel_escaped
+    core_rel_escaped=$(printf '%s' "$core_rel" | sed 's/[\/&]/\\&/g')
+    sed -i.bak "s#index: ${rel_escaped}\$#index: ${core_rel_escaped}#" "$DRAWERS_FILE" 2>/dev/null && rm -f "${DRAWERS_FILE}.bak"
   fi
 }
 

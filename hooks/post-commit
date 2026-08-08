@@ -271,7 +271,7 @@ if not ctx.exists():
 
 # Wissensdateien mit Eintragslimits
 # Format: Einträge sind ``` ... ``` Blöcke mit ID: oder RULE: als erste Zeile darin
-knowledge_files = {"_gotchas.md": 15, "debug_patterns.md": 15, "security.md": 10, "testing.md": 10}
+knowledge_files = {"_gotchas.md": 15, "debug_patterns.md": 15, "security.md": 10, "testing.md": 10, "playbooks.md": 15}
 
 def get_priority(block_text):
     """Lese P: Feld aus einem Eintrag. Default: 2 (rückwärtskompatibel)."""
@@ -282,7 +282,7 @@ def priority_trim(content, max_entries, fname):
     """Trimmt Einträge nach Priorität: P3 zuerst, dann P2. P1 niemals löschen."""
     # Finde Header (alles vor dem ersten ``` Block mit ID:/RULE:)
     # Eintrag-Format: ``` \nID: ... \n ... ```  oder  ``` \nRULE: ... \n ... ```
-    block_pattern = re.compile(r'```\s*\n(?:ID:|RULE:)[\s\S]*?```', re.MULTILINE)
+    block_pattern = re.compile(r'```\s*\n(?:ID:|RULE:|PLAYBOOK:)[\s\S]*?```', re.MULTILINE)
     entries = block_pattern.findall(content)
 
     if len(entries) <= max_entries:
@@ -350,7 +350,30 @@ if temp_path.exists():
             result.append(line)
             if "Recent Changes" in line:
                 result.extend(change_lines[-5:])
-        temp_path.write_text("\n".join(result) + "\n", encoding="utf-8")
+        content = "\n".join(result) + "\n"
+        temp_path.write_text(content, encoding="utf-8")
+
+    # FIX (v8.0.2): memory_save (type=note) haengt jeden Fakt als freie
+    # "- ... (YYYY-MM-DD) <!-- hash:... -->"-Zeile an (mcp/src/lib/save.ts).
+    # Der obige Trim erfasst nur den strukturierten "Recent Changes"-Block
+    # (Zeilen "[YYYY-...") -- diese freien Zeilen wuchsen unbegrenzt weiter,
+    # weil sie nirgends gekappt wurden. Kappung: neueste 10 behalten (10
+    # statt der 15 bei den Wissensdateien -- _temp_notes.md traegt
+    # zusaetzlich den strukturierten Recent-Changes-Block, 15 freie
+    # Eintraege hätten die 600-Token-Grenze trotzdem gerissen).
+    note_pattern = re.compile(r'^- .+<!-- hash:[0-9a-f]+ -->\s*$', re.MULTILINE)
+    note_lines = note_pattern.findall(content)
+    if len(note_lines) > 10:
+        kept = set(note_lines[-10:])
+        out_lines = []
+        for line in content.splitlines():
+            if note_pattern.match(line) and line not in kept:
+                continue
+            out_lines.append(line)
+        # Mehrfache Leerzeilen (durch entfernte Eintraege) auf eine reduzieren
+        cleaned = re.sub(r'\n{3,}', '\n\n', "\n".join(out_lines))
+        temp_path.write_text(cleaned.rstrip() + "\n", encoding="utf-8")
+        print(f"  Trim _temp_notes.md: {len(note_lines) - 10} alte memory_save-Eintraege entfernt")
 PYEOF
 
 # ---- Schubladen-Check (Overflow-Management) ----

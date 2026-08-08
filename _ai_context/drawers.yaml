@@ -40,7 +40,7 @@ drawers:
 
   - id: state
     label: "Client-State"
-    index: frontend/state.md
+    index: frontend/state_core.md
     match:
       globs: ["src/store/**"]
       keywords: [store, state, context, redux, zustand]

@@ -1,82 +1,43 @@
 # 🏃 Current Sprint
-**Status:** 🟢 Fresh · **Updated:** 2026-04-14 · **Period:** [START] → [END]
+**Status:** 🟢 Fresh · **Updated:** 2026-08-06
 
 > Claude: Load this file when unclear where we stand or which tasks are open.
-> After each completed task: check off here + add Daily Log entry.
+> After each completed task: check off here + add a line to Recent Changes
+> in `_temp_notes.md` (this file stays lean — no full Daily Log dump here).
 
 ---
 
 ## 🎯 Sprint Goal
 ```
-[One sentence: what we want to achieve by end of sprint]
-Example: "MVP with user auth, dashboard, and first CRUD feature live"
+v8 ist geshippt (Pro-Rollout, Self-Update, Self-Healing). Aktuell:
+Repo-Hygiene — Doctor-Warnungen auf 0, Pro global + auf allen registrierten
+Projekten aktiv, keine stillen No-Ops mehr in Kernmechanismen.
 ```
 
 ---
 
 ## 📋 Tasks
 
-> **Definition of Done:** Ein Task gilt erst als ✅ abgeschlossen wenn:
-> 1. Code funktioniert (kein offensichtlicher Fehler)
-> 2. Die relevante Kontextdatei aktualisiert wurde (Datum + Marker ✅ gesetzt)
-> 3. Dieser Task hier abgehakt und im Daily Log eingetragen ist
-
-### 🔨 In Progress
-- [ ] [Task 1 — estimated effort]
-- [ ] [Task 2]
+### ✅ Done (2026-08-06)
+- [x] Pro-Edition global + auf allen 9 registrierten Projekten installiert
+- [x] Auto-Invalidierung-Bug (seit v5 wirkungslos) gefixt + E2E-verifiziert
+- [x] Drawer-Split lässt Original-Datei + drawers.yaml-Pointer nicht mehr verwaisen
+- [x] memory_save (`note`) wächst nicht mehr unbegrenzt in `_temp_notes.md`
+- [x] Demo-Boilerplate (`test-kontext`-Restpfade) aus Kontextdateien entfernt
 
 ### 📋 Open
-- [ ] [Task 3]
-- [ ] [Task 4]
-
-### ✅ Done
-- [x] Project setup (Next.js + Prisma + Auth)
-- [x] `_ai_context/` initialized
-
----
-
-## 🐛 Active Bugs
-
-| # | Description | Priority | Status |
-|---|---|---|---|
-| 1 | [Bug description] | 🔴 Critical | Open |
+- [ ] Ollama-Client/Server-Versionsdrift beheben (Client 0.22.1 vs Server 0.19.0)
+- [ ] `decisions.md`-Wachstum beobachten (aktuell knapp unter 600-Token-Grenze)
 
 ---
 
 ## 🧠 Important Context for Claude
 ```
-Currently building:   [Feature name]
-Do not touch:         [e.g. "auth/route.ts is mid-migration — don't change"]
-Blocked by:           [e.g. "Waiting for API keys from service X"]
-Next decision needed: [e.g. "Which payment provider?"]
+Do not touch:  ai-context-drawer.sh split_domain_file() löscht jetzt bewusst
+               das Original nach dem Split (rm -f "$abs_file") — kein Rückbau,
+               das war der Bugfix.
 ```
 
 ---
-
-## 🔭 Next Sprint (Preview)
-- [ ] [Planned feature]
-- [ ] [Tech debt]
-
----
-
-## 📝 Daily Log
-> Claude: Nach JEDEM Task einen Eintrag hinzufügen. Strikt dieses Format verwenden.
-
-```
-[DATUM HH:MM] | Task: [Task in 5 Worten]
-  Gemacht:      [Was konkret geändert wurde]
-  Source-Files: [Welche Quell-Dateien wurden geändert, z.B. src/app/api/worksheets/route.ts]
-  Context-Files:[Welche Kontext-Dateien aktualisiert, z.B. backend/api.md ✅]
-  Problem:      [Wichtige Entscheidung oder Problem, falls vorhanden — sonst "-"]
-  Nächster:     [Nächster logischer Schritt]
-```
-
-### 2026-04-14 — Sprint Start
-```
-[DATE 09:00] | Task: Sprint gestartet, Ziele definiert
-  Gemacht:      current_sprint.md erstellt
-  Source-Files: -
-  Context-Files: current_sprint.md ✅
-  Problem:      -
-  Nächster:     Erste Tasks in Angriff nehmen
-```
+> WRITEBACK RULE: Abgeschlossene Tasks hierher, ausführliche Änderungen →
+> `_temp_notes.md` Recent Changes (max 5, auto-getrimmt).

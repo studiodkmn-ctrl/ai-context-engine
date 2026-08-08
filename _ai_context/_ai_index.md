@@ -13,8 +13,8 @@ Nächstes:       [Was als nächstes ansteht]
 ```
 Stack:    Test
 Phase:    Beta
-Git:      ad1a8948ff86db0c14087c0ef10c13f00bfe9766
-Session:  2026-07-28
+Git:      084fcd4fe7f35f74a8f79597796c53d1c2d62cd0
+Session:  2026-08-08
 ```
 
 ## 📚 Datei-Tabelle

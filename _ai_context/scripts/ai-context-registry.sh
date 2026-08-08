@@ -70,6 +70,7 @@ KNOWLEDGE_FILES = [
     ("frontend/routing.md",    "rule"),
     ("architecture.md",        "arch"),
     ("decisions.md",           "arch"),
+    ("playbooks.md",           "playbook"),
 ]
 
 # STOPWORDS + Token-Schätzung + Tag-Extraktion leben jetzt in scripts/lib/ctx.py
@@ -87,7 +88,7 @@ for rel_file, chunk_type in KNOWLEDGE_FILES:
     found = list(ANCHOR_RE.finditer(content))
 
     if not found:
-        if re.search(r'```\s*\n(?:ID:|RULE:)', content):
+        if re.search(r'```\s*\n(?:ID:|RULE:|PLAYBOOK:)', content):
             no_anchor_files.append(rel_file)
         continue
 
@@ -240,7 +241,8 @@ if [ "${1:-}" = "--add-anchors" ]; then
     TARGET_FILES=()
     for f in "_gotchas.md" "debug_patterns.md" "security.md" "testing.md" \
              "backend/auth.md" "backend/database.md" "backend/endpoints.md" \
-             "frontend/components.md" "frontend/state.md" "frontend/routing.md"; do
+             "frontend/components.md" "frontend/state.md" "frontend/routing.md" \
+             "playbooks.md"; do
       [ -f "$CONTEXT_DIR/$f" ] && TARGET_FILES+=("$CONTEXT_DIR/$f")
     done
   fi
@@ -258,9 +260,9 @@ if not path.exists():
 
 content = path.read_text(encoding='utf-8')
 
-# Match code-fence blocks mit ID: oder RULE: als erste Zeile
+# Match code-fence blocks mit ID:/RULE:/PLAYBOOK: als erste Zeile
 block_re = re.compile(
-    r'(```[ \t]*\n)((?:ID:|RULE:)\s*(\S+)[^\n]*\n[\s\S]*?)(```)',
+    r'(```[ \t]*\n)((?:ID:|RULE:|PLAYBOOK:)\s*(\S+)[^\n]*\n[\s\S]*?)(```)',
     re.MULTILINE
 )
 

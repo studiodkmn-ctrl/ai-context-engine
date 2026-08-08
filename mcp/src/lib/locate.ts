@@ -240,6 +240,7 @@ const KNOWLEDGE_FILES: Array<[string, string]> = [
   ['frontend/components.md', 'component'],
   ['frontend/state.md', 'rule'],
   ['frontend/routing.md', 'rule'],
+  ['playbooks.md', 'playbook'],
 ];
 
 function chunksFromMarkdownFallback(contextDir: string): RegistryChunk[] {
@@ -533,10 +534,22 @@ export async function locateQuery(query: string, root: string): Promise<LocateRe
     if (!topFile) topFile = top.file;
   }
 
-  if (chunkHits.length) {
+  const playbookHits = chunkHits.filter(h => h.chunk.type === 'playbook');
+  const knowledgeHits = chunkHits.filter(h => h.chunk.type !== 'playbook');
+
+  if (playbookHits.length) {
+    lines.push('');
+    lines.push('📘 Passendes Playbook:');
+    for (const h of playbookHits) {
+      lines.push(`   ${h.chunk.id} [P${h.chunk.priority}]${freshnessNote(h.chunk)}`);
+      if (!topFile) topFile = h.chunk.file;
+    }
+  }
+
+  if (knowledgeHits.length) {
     lines.push('');
     lines.push('⚡ Verwandte Gotchas/Patterns:');
-    for (const h of chunkHits) {
+    for (const h of knowledgeHits) {
       lines.push(`   ${h.chunk.id} [P${h.chunk.priority}]${freshnessNote(h.chunk)}`);
       if (!topFile) topFile = h.chunk.file;
     }

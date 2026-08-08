@@ -64,7 +64,8 @@ import ctx as ctxlib  # scripts/lib/ctx.py — shared token/registry/freshness h
 
 KNOWLEDGE = ['_gotchas.md', 'debug_patterns.md', 'security.md', 'testing.md',
              'backend/auth.md', 'backend/database.md', 'backend/endpoints.md',
-             'frontend/components.md', 'frontend/state.md', 'frontend/routing.md']
+             'frontend/components.md', 'frontend/state.md', 'frontend/routing.md',
+             'playbooks.md']
 
 results = []  # (check_id, status, fixkind, message, [details])
 
@@ -93,7 +94,7 @@ for p in context_md_files():
         all_anchors.add(m.group(1))
 
 # ============================ Check 1: Anker fehlen ========================
-block_re = re.compile(r'```[ \t]*\n(?:ID:|RULE:)\s*(\S+)', re.MULTILINE)
+block_re = re.compile(r'```[ \t]*\n(?:ID:|RULE:|PLAYBOOK:)\s*(\S+)', re.MULTILINE)
 missing_anchor = []
 for rf in KNOWLEDGE:
     fp = ctx / rf
@@ -223,8 +224,15 @@ else:
     emit('index', 'PASS', 'NONE', 'Index ↔ Dateien konsistent')
 
 # ====================== Check 7: übergroße Dateien =========================
+# FIX (v8.0.2): *_archive.md (und *_extended.md) existieren genau dafuer,
+# Overflow aufzunehmen, das ist ihr Zweck (siehe ai-context-drawer.sh) -- sie
+# hier trotzdem als "zu gross" zu flaggen, macht die Split-Regel gegen sich
+# selbst arbeiten: jede wachsende Archiv-Datei waere dauerhaft rot. Andere
+# Checks (Anker/Pointer/Deadrefs) laufen weiterhin ueber sie.
 oversized = []
 for p in context_md_files():
+    if p.name.endswith('_archive.md'):
+        continue
     t = est_tokens(p.read_text(encoding='utf-8', errors='ignore'))
     if t > 600:
         oversized.append(f'{rel(p)} (~{t} Tokens)')

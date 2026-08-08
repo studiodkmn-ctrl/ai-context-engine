@@ -1,4 +1,4 @@
-# 🔒 Security — /Users/adnandikmen/Desktop/test-kontext
+# 🔒 Security — ai-context-engine
 > **Max 10 Regeln. Code-Format. Laden bei API/Auth-Tasks.**
 > Aktualisiert: 2026-04-14
 > P: 1=kritisch (nie löschen) | 2=wichtig (default) | 3=nice-to-know (zuerst archiviert)

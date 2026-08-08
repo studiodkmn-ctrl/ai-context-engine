@@ -38,6 +38,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f _ai_context/scripts/ai-read-guard.sh ] && bash _ai_context/scripts/ai-read-guard.sh || true"
+          }
+        ]
+      }
     ]
   }
 }

@@ -1,4 +1,4 @@
-# 🔍 Debug Patterns — /Users/adnandikmen/Desktop/test-kontext
+# 🔍 Debug Patterns — ai-context-engine
 > **Max 15. Laden nur bei Debugging. Code-Format.**
 > Aktualisiert: 2026-04-14
 
@@ -18,21 +18,6 @@ fix: 'use client' Direktive + useEffect für browser-only Code
 @ alle Client-Components mit Browser-APIs
 ```
 <!-- /hydration_mismatch -->
-
-<!-- #prisma_connection -->
-```
-ID: prisma_connection
-P: 2
-→ DB-Verbindung schlägt fehl
-? "Can't reach database" / P1001 Error
-fix:
-  1. DATABASE_URL in .env prüfen
-  2. npx prisma generate
-  3. npx prisma db push
-@ prisma/schema.prisma, .env
-⇒ _gotchas.md#prisma_singleton
-```
-<!-- /prisma_connection -->
 
 ```
 ID: _template

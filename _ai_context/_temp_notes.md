@@ -35,24 +35,4 @@ Due:           -
 >       Auto-Trim in hooks/post-commit. ⇒ _gotchas.md#silent_noop_needs_effect_test
 > Permanent facts → _quick_facts.md | Technical gotchas → _gotchas.md
 
-- Intent: feat(v8.1): Duplicate-Read-Guard + playbooks.md (prozedurales Gedächtnis)  (2026-08-08) <!-- hash:37629de39888 -->
-
-- Intent: fix(v8.1.1): migrate.sh vergaß playbooks.md + PreToolUse-Hook  (2026-08-08) <!-- hash:0d03655126dd -->
-
-- Testfakt SMOKE-1786218986998: stdio MCP funktioniert  (2026-08-08) <!-- hash:760ad68b6bd7 -->
-
-- Intent: feat(v9-a): knowledge.manifest.yaml — einzige Quelle für Wissensdateien  (2026-08-08) <!-- hash:e4dee2157e61 -->
-
-- Testfakt SMOKE-1786220826620: stdio MCP funktioniert  (2026-08-08) <!-- hash:1c7f18e0792b -->
-
-- Intent: feat(v9-b): ai-prompt-router.sh — locate() ohne Kommando  (2026-08-08) <!-- hash:d4dd6aa78c3b -->
-
-- Testfakt SMOKE-1786222235632: stdio MCP funktioniert  (2026-08-08) <!-- hash:5de7090ded07 -->
-
-- Intent: feat(v9-c): ai-session-reflect.sh — automatisches Lernen (Stop/PreCompact)  (2026-08-08) <!-- hash:ad231a728a52 -->
-
-- Intent: feat(v9-d): bench/ai-bench.sh — Beweis-Harness statt Schätzungen  (2026-08-08) <!-- hash:e31720788f31 -->
-
-- Testfakt SMOKE-1786228402256: stdio MCP funktioniert  (2026-08-08) <!-- hash:e6ea6ff2efbf -->
-
-- Intent: feat(v9-e): semantischer locate()-Fallback + Multi-Agent-Adapter  (2026-08-08) <!-- hash:0b51bb782682 -->
+- Intent: fix(v10-r1): Wissensbasis entgiften + demo_content-Check  (2026-08-08) <!-- hash:157267861aab -->

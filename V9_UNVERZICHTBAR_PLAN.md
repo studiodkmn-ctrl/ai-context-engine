@@ -1,7 +1,14 @@
 # V9 — Unverzichtbar-Plan: Automatisch statt auf Zuruf, bewiesen statt behauptet, überall statt nur Claude Code
-> **Status: ENTWURF** — erstellt 2026-08-08 auf Basis der v8.1-Session
-> (Graphify-Analyse → Read-Guard + playbooks.md → Rollout auf 9 Projekte).
+> **Status: IN UMSETZUNG** — v9-a/b/c/d live (2026-08-08), v9-e offen.
+> Erstellt 2026-08-08 auf Basis der v8.1-Session (Graphify-Analyse →
+> Read-Guard + playbooks.md → Rollout auf 9 Projekte).
 > Umsetzung: phasenweise, jede Phase einzeln committbar und verifizierbar.
+>
+> - [x] v9-a — knowledge.manifest.yaml (Baustein D)
+> - [x] v9-b — ai-prompt-router.sh (Baustein B1)
+> - [x] v9-c — ai-session-reflect.sh (Baustein A)
+> - [x] v9-d — bench/ai-bench.sh (Baustein C) — erste echte Zahlen in BENCHMARKS.md
+> - [ ] v9-e — semantischer locate()-Fallback (B2) + Agents-Sync (E)
 
 ---
 

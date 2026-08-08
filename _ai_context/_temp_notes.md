@@ -46,3 +46,5 @@ Due:           -
 - Testfakt SMOKE-1786220826620: stdio MCP funktioniert  (2026-08-08) <!-- hash:1c7f18e0792b -->
 
 - Intent: feat(v9-b): ai-prompt-router.sh — locate() ohne Kommando  (2026-08-08) <!-- hash:d4dd6aa78c3b -->
+
+- Testfakt SMOKE-1786222235632: stdio MCP funktioniert  (2026-08-08) <!-- hash:5de7090ded07 -->

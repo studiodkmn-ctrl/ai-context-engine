@@ -632,6 +632,22 @@ EOF
     fi
   fi
 
+  # Section 3e: Reflect-Inbox (v9-c — automatische Session-Reflexion)
+  REFLECT_INBOX="$CONTEXT_DIR/.session/reflect-inbox.md"
+  if [ -f "$REFLECT_INBOX" ]; then
+    RI_COUNT=$(grep -c '^## ' "$REFLECT_INBOX" 2>/dev/null || echo 0)
+    RI_COUNT="${RI_COUNT//[^0-9]/}"
+    if [ "${RI_COUNT:-0}" -gt 0 ]; then
+      echo "---"
+      echo ""
+      echo "## 📥 Reflect-Inbox"
+      echo "> $RI_COUNT Vorschlag/Vorschläge aus letzter Session in"
+      echo "> \`_ai_context/.session/reflect-inbox.md\` — prüfen und ggf. in"
+      echo "> playbooks.md/debug_patterns.md übernehmen."
+      echo ""
+    fi
+  fi
+
   # Section 4: Suggested files
   if [ -n "$SUGGESTED_FILES" ]; then
     echo "---"

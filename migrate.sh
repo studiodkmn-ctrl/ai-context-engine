@@ -244,11 +244,12 @@ PII_CMD="if [ -f ~/.ai-context/hooks/pii-warn.sh ]; then bash ~/.ai-context/hook
 SELFCHECK_CMD="if [ -f ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh ]; then bash ~/.ai-context/_ai_context_template/scripts/ai-context-selfcheck.sh --session 2>&1 || true; fi"
 READGUARD_CMD="[ -f _ai_context/scripts/ai-read-guard.sh ] && bash _ai_context/scripts/ai-read-guard.sh || true"
 ROUTER_CMD="[ -f _ai_context/scripts/ai-prompt-router.sh ] && bash _ai_context/scripts/ai-prompt-router.sh || true"
+REFLECT_CMD="[ -f _ai_context/scripts/ai-session-reflect.sh ] && bash _ai_context/scripts/ai-session-reflect.sh || true"
 
 mkdir -p ".claude"
 
 if command -v python3 &>/dev/null; then
-  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" "$READGUARD_CMD" "$ROUTER_CMD" << 'PYEOF'
+  python3 - "$SETTINGS" "$DOCTOR_CMD" "$SESSION_CMD" "$PII_CMD" "$CAT_SESSION_CMD" "$SELFCHECK_CMD" "$READGUARD_CMD" "$ROUTER_CMD" "$REFLECT_CMD" << 'PYEOF'
 import json, sys, pathlib
 
 path      = pathlib.Path(sys.argv[1])
@@ -259,6 +260,7 @@ cat_session_cmd = sys.argv[5]
 selfcheck_cmd   = sys.argv[6]
 readguard_cmd   = sys.argv[7]
 router_cmd      = sys.argv[8]
+reflect_cmd     = sys.argv[9]
 
 if path.exists():
     try:
@@ -365,6 +367,20 @@ if not has_readguard:
     print("   ✅ PreToolUse: ai-read-guard.sh hinzugefügt")
 else:
     print("   ✅ PreToolUse: ai-read-guard.sh bereits vorhanden")
+
+# ---- v9-c: Stop + PreCompact — Session-Reflexion ----
+for event in ("Stop", "PreCompact"):
+    ev_groups = hooks.setdefault(event, [])
+    has_reflect = any(
+        any("ai-session-reflect" in h.get("command", "") for h in g.get("hooks", []))
+        for g in ev_groups
+    )
+    if not has_reflect:
+        ev_groups.append({"matcher": "", "hooks": [{"type": "command", "command": reflect_cmd}]})
+        changed = True
+        print(f"   ✅ {event}: ai-session-reflect.sh hinzugefügt")
+    else:
+        print(f"   ✅ {event}: ai-session-reflect.sh bereits vorhanden")
 
 if changed:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')

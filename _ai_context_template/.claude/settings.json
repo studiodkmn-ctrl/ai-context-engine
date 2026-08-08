@@ -53,6 +53,28 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f _ai_context/scripts/ai-session-reflect.sh ] && bash _ai_context/scripts/ai-session-reflect.sh || true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f _ai_context/scripts/ai-session-reflect.sh ] && bash _ai_context/scripts/ai-session-reflect.sh || true"
+          }
+        ]
+      }
     ]
   }
 }

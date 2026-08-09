@@ -49,7 +49,7 @@ MINIMAL_MODE=false
 FORCE_REGEN=false
 
 # ---- Token Budget ----
-TOKEN_BUDGET_SOFT=2000    # Soft-Limit → P2/P3 zu Pointern kollabieren
+TOKEN_BUDGET_SOFT=1200    # Soft-Limit → P2/P3 zu Pointern kollabieren (V10 R3: von 2000 gesenkt — was hier steht, wird in JEDEM Turn erneut bezahlt)
 BUDGET_GOTCHAS=600        # Max-Budget für Gotchas-Sektion
 # Hard-Limit nur in Pro (Simple: keine Truncation)
 if [ "$(cat "$HOME/.ai-context/edition" 2>/dev/null || echo simple)" = "pro" ]; then
@@ -371,37 +371,14 @@ TOTAL_TOKENS=0
 
 ## 🎯 Behavior Rules (MUST apply)
 
-Diese Regeln überschreiben das Default-Verhalten und müssen strikt angewendet werden:
-
-1. **Bei wo/warum/fix-Fragen** (Bug-Meldungen, Stack-Traces, "wo ist Funktion X",
-   "welche Felder hat Typ Y", Code-Aufgaben wie Route/Komponente/Schema erstellen):
-   ZUERST das MCP-Tool `locate(<beschreibung>)` aufrufen — es fächert über
-   Interaction Map, Symbol Map, Interfaces, Gotchas/Debug-Patterns (mit
-   Frische-Status), Invarianten und Impact-Graph in einem Lookup.
-   Nur wenn `locate` keinen Treffer liefert: grep/Read wie gewohnt.
-   Kein MCP verfügbar? Fallback: `bash _ai_context/scripts/ai-symptom-router.sh "<beschreibung>"`.
-   Danach normal mit dem Ergebnis weiterarbeiten (Fix zeigen, Code erstellen, ...).
-
-2. **Bei Sprint-/Status-Fragen** ("Was haben wir diese Woche gemacht?"):
-   Lade `_temp_notes.md` + `git log --since='7 days ago' --oneline`.
-   Zeige im Format:
-   ```
-   ✅ Abgeschlossen: <bullet list>
-   🔨 In Arbeit:    <bullet list>
-   📋 Offen:         <bullet list>
-   ```
-
-3. **Projektregeln sind verbindlich**: Auth-Check, Prisma-Singleton, etc. aus Quick Facts
-   wendest du bei neuem Code automatisch an — kein Disclaimer, keine Nachfrage nötig.
-
-4. **Sprachregel**: Kommunikation Deutsch, Code & Identifier Englisch.
-
-5. **Session-Übergabe** (HANDOFF.md):
-   → Bei Session-Start: Falls HANDOFF-Sektion unten "Status: in_progress" zeigt,
-     LIES sie zuerst und setze die Arbeit dort fort.
-   → Bei Session-Ende: Wenn Aufgabe NICHT fertig ist, schreibe Zustand
-     in `HANDOFF.md` (Status, Was läuft, Nächster Schritt, Geänderte Dateien).
-     Wenn Aufgabe FERTIG ist: HANDOFF.md leeren oder `Status: done` setzen.
+1. **wo/warum/fix-Fragen** → ZUERST `locate("<beschreibung>")` (MCP), kein
+   Treffer → grep/Read. Ohne MCP: `bash _ai_context/scripts/ai-symptom-router.sh "<…>"`.
+2. **Sprint-/Status-Fragen** → `_temp_notes.md` + `git log --since='7 days ago' --oneline`.
+3. **Regeln aus den Gotchas-/Security-Chunks gelten automatisch** bei neuem
+   Code — kein Disclaimer, keine Nachfrage.
+4. **Sprache**: Kommunikation Deutsch, Code & Identifier Englisch.
+5. **HANDOFF.md**: zeigt sie unten `in_progress`, dort fortsetzen. Das
+   Schreiben übernimmt `ai-session-reflect.sh` automatisch.
 
 ---
 HEADER
@@ -445,8 +422,29 @@ NPM_RULE
     echo "## 🤝 Aktive Session-Übergabe (in_progress)"
     echo "> Vorherige Session unfertig. Lies das zuerst, dann setze Arbeit fort."
     echo ""
-    # Inline only the body — strip header comments
-    sed -n '/^\*\*Status:/,/^---$/p' "$HANDOFF_FILE" | sed '$d'
+    # Inline only the body — strip header comments.
+    # V10 R3: leere Abschnitte ("[leer wenn nichts]", "[Optional]") ueberspringen.
+    # Das HANDOFF-Geruest hat 8 optionale Sektionen; unausgefuellt waren das
+    # ~100 Tokens reine Platzhalter — in JEDEM Turn erneut bezahlt.
+    sed -n '/^\*\*Status:/,/^---$/p' "$HANDOFF_FILE" | sed '$d' \
+      | python3 -c '
+import re, sys
+text = sys.stdin.read()
+# In Abschnitte ab "## " zerlegen; Kopf (Status/Datum) bleibt immer.
+parts = re.split(r"(?=^## )", text, flags=re.M)
+keep = []
+for p in parts:
+    body = re.sub(r"^## .*\n?", "", p, count=1)
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+    # Fett-Zwischenlabels ("**MUSS erhalten bleiben:**") und Platzhalter
+    # entfernen — bleibt nichts uebrig, war der Abschnitt nie ausgefuellt.
+    body = re.sub(r"^\*\*.*?:\*\*.*$", "", body, flags=re.M)
+    body = re.sub(r"\[(leer wenn nichts|Optional)\]", "", body)
+    if p.startswith("## ") and not body.strip():
+        continue
+    keep.append(p.rstrip())
+print("\n\n".join(x for x in keep if x.strip()))
+' 2>/dev/null || sed -n '/^\*\*Status:/,/^---$/p' "$HANDOFF_FILE" | sed '$d'
     echo ""
     T=$(count_tokens "$HANDOFF_FILE")
     TOTAL_TOKENS=$((TOTAL_TOKENS + T))
@@ -585,21 +583,27 @@ EOF
     T=$(count_tokens "$IDX_DIR/${SUGGESTED_DOMAIN}.md")
     TOTAL_TOKENS=$((TOTAL_TOKENS + T))
   else
-    # Show all domain indexes compactly
-    echo "### Domain-Indizes (alle)"
+    # V10 R3: ohne erkannte Domain nur EINE Zeiger-Zeile pro Domain statt
+    # aller Volltabellen. Die Tabellen kosteten ~300 Tokens in JEDEM Turn,
+    # obwohl ohne Domain-Bezug keine davon zur Aufgabe gehört. Details holt
+    # sich der Agent bei Bedarf aus _idx/<domain>.md.
+    echo "### Domain-Indizes (Details: \`_idx/<domain>.md\`)"
     for idx_file in "$IDX_DIR"/*.md; do
       [ ! -f "$idx_file" ] && continue
       domain=$(basename "$idx_file" .md)
       # symbols.md/interfaces.md sind keine Domain-Router-Tabellen, sondern
       # die Navigations-Indizes aus Section 0.6 (dort schon inline) — überspringen.
       case "$domain" in symbols|interfaces) continue ;; esac
-      echo ""
-      echo "#### $domain"
-      # Just show the table, not the header — grep findet ggf. nichts (leere
-      # Domain-Datei), das ist kein Fehler, daher || true statt set -e-Abbruch.
-      grep '^|' "$idx_file" 2>/dev/null || true
-      echo ""
+      # Dateinamen aus der ersten Spalte ziehen (Header-/Trennzeilen raus).
+      # paste -sd', ' rotiert die Zeichen (Komma, Leerzeichen, Komma …) und
+      # erzeugt dadurch uneinheitliche Trenner — daher mit einem Zeichen
+      # zusammenfuegen und danach das Leerzeichen ergaenzen.
+      files=$(grep '^| `' "$idx_file" 2>/dev/null \
+        | sed 's/^| `\([^`]*\)`.*/\1/' | paste -sd',' - | sed 's/,/, /g' || true)
+      [ -z "$files" ] && continue
+      echo "- **$domain**: $files"
     done
+    echo ""
   fi
 
   # Section 3c: Interaction Map (Bug-Fix-Beschleuniger v6.5)
@@ -899,16 +903,11 @@ PYEOF
 
 ## 📋 Runtime-Regeln
 ```
-ROUTER:   Micro-Index → Domain-Index → Kontextdatei (max 3 Dateien pro Kette)
-LADEN:    Max 4 Dateien pro Session gesamt
-NAVIGATE: Vor Datei-Read → _idx/symbols.md (Funktion → Zeile) + _idx/interfaces.md (Typen)
+ROUTER:   Micro-Index → Domain-Index → Kontextdatei (max 3 pro Kette)
+LADEN:    Max 4 Dateien pro Session, nur aus der relevanten Domain
+NAVIGATE: Vor Datei-Read → _idx/symbols.md + _idx/interfaces.md
 HOTPATHS: hot_paths.md lesen statt Invarianten aus Code rekonstruieren
 GOTCHAS:  Immer bei Coding-Tasks (oben inline wenn vorhanden)
-WRITE:    Nach jeder Aufgabe → relevante Kontextdatei + Domain-Index Status aktualisieren
-DEDUP:    Vor Writeback IDs prüfen → Update statt Duplikat
-LIMITS:   _gotchas.md/debug_patterns.md max 15 | security.md/testing.md max 10 | _temp_notes max 5
-SPLIT:    Datei > 500 Tokens? → Aufteilen in kleinere Domain-Dateien
-SCAN:     Domain-Router beachten — nur Dateien aus relevanter Domain laden
 NIE:      Ganzen Codebase laden | Alle Kontextdateien auf einmal | Stack raten
 ```
 RULES

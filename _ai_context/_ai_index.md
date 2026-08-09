@@ -13,7 +13,7 @@ Nächstes:       [Was als nächstes ansteht]
 ```
 Stack:    Bash + Python 3 + TypeScript (MCP)
 Phase:    aktiv
-Git:      b0a5b5bcfda2a665e8e303eac8fef9542185d35b
+Git:      a2582ec3f9ae36236e450d9e849ad30153f89b0c
 Session:  2026-08-09
 ```
 

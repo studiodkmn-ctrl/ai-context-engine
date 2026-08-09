@@ -27,3 +27,24 @@ tasks:
     expect_any_of_each:
       - ["ai-read-guard.sh"]
       - ["pretooluse"]
+
+  # V10 R4: zwei Aufgaben der Zielklasse. fixture_5bugs ("finde alles")
+  # zwingt zum Lesen jeder Datei — dort kann Routing prinzipiell nichts
+  # sparen. Diese beiden testen, wofuer das System gebaut ist: EIN Symptom
+  # gezielt lokalisieren, und ein Symptom in anderem Vokabular als die
+  # Wissensbasis (prueft den semantischen Fallback aus v9-e mit).
+  - id: fix_one_symptom
+    project: /Users/adnandikmen/Desktop/kontext-token/test-projekt
+    prompt: >-
+      Der Admin-Endpoint liefert Daten aus, ohne dass ein Login geprueft
+      wird. Welche Datei ist die Ursache? Antworte kurz mit Dateipfad.
+    expect_any_of_each:
+      - ["admin/route.ts"]
+
+  - id: vocab_mismatch
+    project: /Users/adnandikmen/Desktop/kontext-token/test-projekt
+    prompt: >-
+      Beim lokalen Entwickeln laufen die Datenbankverbindungen voll.
+      Welche Datei ist schuld? Antworte kurz mit Dateipfad.
+    expect_any_of_each:
+      - ["db.ts"]

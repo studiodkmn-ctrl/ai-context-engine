@@ -125,7 +125,7 @@ def grade(result_text: str, expect_any_of_each: list[list[str]]) -> tuple[int, i
     return (hit, len(expect_any_of_each))
 
 
-def run_task(task: dict, model: str, claude_bin: str, results_path: Path) -> None:
+def run_task(task: dict, model: str, claude_bin: str, results_path: Path, phase: str) -> None:
     project_dir = Path(task["project"])
     if not project_dir.exists():
         print(f"  ⚠️  {task['id']}: Projekt nicht gefunden: {project_dir}", file=sys.stderr)
@@ -137,12 +137,14 @@ def run_task(task: dict, model: str, claude_bin: str, results_path: Path) -> Non
             print(f"  ▶ {task['id']} [{arm_label}, {model}] ...", file=sys.stderr)
             data = run_claude(claude_bin, arm_dir, task["prompt"], model)
             usage = data.get("usage", {})
-            input_tokens = (usage.get("cache_creation_input_tokens", 0) +
-                             usage.get("cache_read_input_tokens", 0))
+            cache_creation = usage.get("cache_creation_input_tokens", 0)
+            cache_read = usage.get("cache_read_input_tokens", 0)
+            input_tokens = cache_creation + cache_read
             output_tokens = usage.get("output_tokens", 0)
             hit, total = grade(data.get("result", ""), task.get("expect_any_of_each", []))
             record = {
                 "ts": datetime.now(timezone.utc).isoformat(),
+                "phase": phase,
                 "task_id": task["id"],
                 "arm": arm_label,
                 "model": model,
@@ -150,6 +152,8 @@ def run_task(task: dict, model: str, claude_bin: str, results_path: Path) -> Non
                 "num_turns": data.get("num_turns"),
                 "duration_api_ms": data.get("duration_api_ms"),
                 "input_tokens": input_tokens,
+                "cache_creation": cache_creation,
+                "cache_read": cache_read,
                 "output_tokens": output_tokens,
                 "score_hit": hit,
                 "score_total": total,
@@ -158,6 +162,7 @@ def run_task(task: dict, model: str, claude_bin: str, results_path: Path) -> Non
         except Exception as e:
             record = {
                 "ts": datetime.now(timezone.utc).isoformat(),
+                "phase": phase,
                 "task_id": task["id"], "arm": arm_label, "model": model,
                 "error": str(e),
             }
@@ -182,37 +187,99 @@ def generate_report(results_path: Path, out_path: Path) -> None:
         except Exception:
             continue
 
+    # Zeilen ohne phase stammen aus dem ersten Lauf vor Einfuehrung des Feldes.
+    for r in rows:
+        r.setdefault("phase", "v9d-baseline")
+
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for r in rows:
         if r.get("error"):
             continue
-        groups[(r["task_id"], r["arm"], r["model"])].append(r)
+        groups[(r["phase"], r["task_id"], r["arm"], r["model"])].append(r)
+
+    def avg(recs, key):
+        return sum(r.get(key) or 0 for r in recs) / len(recs)
+
+    def avg_score(recs):
+        scored = [r for r in recs if r.get("score_total")]
+        if not scored:
+            return 0.0
+        return sum(r["score_hit"] / r["score_total"] for r in scored) / len(scored)
+
+    # Phasen in der Reihenfolge ihres ersten Auftretens
+    phases = []
+    for r in rows:
+        if r["phase"] not in phases:
+            phases.append(r["phase"])
 
     total_runs = sum(len(v) for v in groups.values())
     lines = [
-        "# BENCHMARKS.md — gemessene Zahlen (v9-d Beweis-Harness)",
+        "# BENCHMARKS.md — gemessene Zahlen",
         "> Automatisch generiert von `bench/ai-bench.py` aus `bench/results.jsonl`.",
-        f"> Stand: {total_runs} Läufe insgesamt. **Vorläufige Stichprobe** — bei",
-        "> kleinem `n` sind Werte verrauscht, siehe `n=` Spalte pro Zeile. Mehr",
-        "> Läufe: `python3 bench/ai-bench.py --repeat 5`.",
+        f"> {total_runs} Läufe insgesamt, nach Phase getrennt (Mischung aus Vorher/",
+        "> Nachher wäre eine Zahl, die nichts aussagt).",
         "",
-        "| Task | Arm | Modell | n | Ø Kosten $ | Ø Input-Tok | Ø Output-Tok | Ø Turns | Ø Score |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "**Gemessen wird Effizienz** — Kosten, Turns, Tokens bis zur Antwort.",
+        "**Korrektheit taugt hier nicht als Beleg**: die Fixture kommentiert ihre",
+        "Bugs im Klartext (`// BUG #1: Auth-Check fehlt komplett`), bei drei der",
+        "vier Tasks erreichen daher beide Arme 100 % — der Score zeigt dort nur,",
+        "dass die Aufgabe lösbar war. Wo die Scores auseinandergehen",
+        "(`vocab_mismatch`, 67 % vs 33 %), ist n=3 bei binärem Ausgang zu klein:",
+        "2 von 3 gegen 1 von 3 richtig ist Zufallsstreuung, keine Aussage.",
+        "",
+        "**Kosten ($) sind die Leitmetrik**, nicht Input-Tokens: `cache_read` ist",
+        "deutlich billiger als `cache_creation`, eine summierte Token-Zahl kann",
+        "also in die falsche Richtung zeigen.",
+        "",
     ]
-    for (task_id, arm, model), recs in sorted(groups.items()):
-        n = len(recs)
-        avg_cost = sum(r.get("cost_usd") or 0 for r in recs) / n
-        avg_in = sum(r.get("input_tokens") or 0 for r in recs) / n
-        avg_out = sum(r.get("output_tokens") or 0 for r in recs) / n
-        avg_turns = sum(r.get("num_turns") or 0 for r in recs) / n
-        scored = [r for r in recs if r.get("score_total")]
-        avg_score = (sum(r["score_hit"] / r["score_total"] for r in scored) / len(scored)
-                     if scored else 0.0)
-        lines.append(
-            f"| {task_id} | {arm} | {model} | {n} | {avg_cost:.4f} | "
-            f"{avg_in:.0f} | {avg_out:.0f} | {avg_turns:.1f} | {avg_score:.0%} |"
-        )
-    lines.append("")
+
+    for phase in phases:
+        keys = sorted(k for k in groups if k[0] == phase)
+        if not keys:
+            continue
+        lines += [
+            f"## Phase `{phase}`",
+            "",
+            "| Task | Arm | n | Ø $ | Ø cache_creation | Ø cache_read | Ø Turns | Ø Score |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for k in keys:
+            recs = groups[k]
+            _, task_id, arm, _model = k
+            cc = avg(recs, "cache_creation")
+            cr = avg(recs, "cache_read")
+            # Altzeilen ohne getrennte Felder: nur die Summe ausweisen.
+            cc_s = f"{cc:.0f}" if cc else "—"
+            cr_s = f"{cr:.0f}" if cr else f"({avg(recs, 'input_tokens'):.0f} ges.)"
+            lines.append(
+                f"| {task_id} | {arm} | {len(recs)} | {avg(recs, 'cost_usd'):.4f} | "
+                f"{cc_s} | {cr_s} | {avg(recs, 'num_turns'):.1f} | {avg_score(recs):.0%} |"
+            )
+        lines.append("")
+
+        # Delta je Task: mit System − ohne System
+        lines += [
+            f"### Delta `{phase}` (mit System − ohne System)",
+            "",
+            "| Task | Δ Kosten $ | Δ % | Δ Turns | Bewertung |",
+            "|---|---|---|---|---|",
+        ]
+        tasks_in_phase = sorted({k[1] for k in keys})
+        for task_id in tasks_in_phase:
+            w = groups.get((phase, task_id, "with_system", "sonnet"))
+            o = groups.get((phase, task_id, "without_system", "sonnet"))
+            if not w or not o:
+                continue
+            cw, co = avg(w, "cost_usd"), avg(o, "cost_usd")
+            d_cost = cw - co
+            d_pct = (d_cost / co * 100) if co else 0.0
+            d_turns = avg(w, "num_turns") - avg(o, "num_turns")
+            verdict = "System spart" if d_cost < 0 else "System kostet mehr"
+            lines.append(
+                f"| {task_id} | {d_cost:+.4f} | {d_pct:+.1f}% | {d_turns:+.1f} | {verdict} |"
+            )
+        lines.append("")
+
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -223,6 +290,9 @@ def main() -> None:
     ap.add_argument("--out", default=str(Path(__file__).parent.parent / "BENCHMARKS.md"))
     ap.add_argument("--results", default=str(Path(__file__).parent / "results.jsonl"))
     ap.add_argument("--repeat", type=int, default=1)
+    # --phase trennt Messreihen (z.B. vor/nach einem Umbau). Ohne das mittelt
+    # der Report ueber alle je gelaufenen Zeilen — eine Zahl, die nichts sagt.
+    ap.add_argument("--phase", default="unlabeled")
     args = ap.parse_args()
 
     claude_bin = find_claude_binary()
@@ -234,7 +304,7 @@ def main() -> None:
           file=sys.stderr)
     for task in tasks:
         for _ in range(args.repeat):
-            run_task(task, args.model, claude_bin, results_path)
+            run_task(task, args.model, claude_bin, results_path, args.phase)
 
     generate_report(results_path, Path(args.out))
     print(f"✅ BENCHMARKS.md aktualisiert: {args.out}", file=sys.stderr)

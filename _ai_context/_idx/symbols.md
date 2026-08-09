@@ -1,6 +1,6 @@
 # Symbol Map — ai-context-engine
-> Auto-generiert: 2026-08-09 03:00 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
-> 13 Dateien · 98 Symbole · Direkt springen: Datei:Zeilennummer
+> Auto-generiert: 2026-08-09 03:35 | Neu generieren: `bash _ai_context/scripts/ai-symbol-map.sh`
+> 13 Dateien · 100 Symbole · Direkt springen: Datei:Zeilennummer
 
 ## `bench/ai-bench.py`
   find_claude_binary                  L38    
@@ -9,8 +9,10 @@
   run_claude                          L106   
   grade                               L120   
   run_task                            L128   
-  generate_report                     L172   
-  main                                L219   
+  generate_report                     L177   
+  avg                                 L200   
+  avg_score                           L203   
+  main                                L286   
 ## `context_manager_agent.py`
   ProjectMetadata                     L37    
   ContextManagerConfig                L56    
